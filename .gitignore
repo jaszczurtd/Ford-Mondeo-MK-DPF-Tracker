@@ -1,0 +1,71 @@
+
+# Arduino / RP2040 build output
+.build/
+build/
+ArduinoOutput/
+*.elf
+*.bin
+*.uf2
+*.hex
+*.map
+*.eep
+*.lss
+*.lst
+*.sym
+*.dis
+*.o
+*.obj
+*.a
+*.d
+*.su
+*.ino.cpp
+compile_commands.json
+build.options.json
+includes.cache
+libraries.cache
+
+# VS Code local/generated configuration
+.vscode/*
+!.vscode/extensions.json
+!.vscode/keybindings.reference.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.vscode/.browse.c_cpp.db*
+.vscode/ipch/
+
+# KiCad generated/local files
+*.kicad_prl
+fp-info-cache
+*-backups/
+*.bak
+*.bck
+*-save.pro
+*-save.kicad_pcb
+*-save.kicad_sch
+**/~*
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+secrets.local.h
+credentials.local.h
+Credentials.local.h
+hal_project_secrets.h
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# AI
+.agents/
+.codex/
+*codex*

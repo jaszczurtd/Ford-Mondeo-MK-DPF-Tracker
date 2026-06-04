@@ -1,0 +1,197 @@
+# TODO - Mondeo DPF Tracker
+
+This file describes the next implementation stages for the project. 
+The README stays as a short project overview, while technical details and the work plan are kept here.
+
+## 1. Maintain the Firmware Telemetry Contract
+
+- Keep the current MQTT contract:
+  - `dpf/data` - JSON measurement data.
+  - `dpf/status` - device status, for example connection state.
+  - `dpf/cmd` - incoming tracker commands.
+- Treat firmware constants as the source of truth in code:
+  - firmware version,
+  - MQTT topic names,
+  - helper-data refresh intervals.
+- Publish the key telemetry fields:
+  - `version`, `time`, `ms`,
+  - `egt_pre`, `egt_mid`,
+  - `dp_voltage`, `dp_raw`,
+  - `pump_onoff_period`, `pump_cnt`,
+  - `glow`, `glow_dur`,
+  - `mcu_temp`,
+  - `cell_valid`, `cell_error`, `cell_age_ms`, `cell_speed_kmh`, `cell_lat`, `cell_lng`, `cell_acc_m`.
+- Round temperature fields to two decimal places before publishing.
+- Remember that `cell_*` values are approximate, because they come from cellular location rather than GNSS/GPS.
+
+## 2. Reliable Payload Delivery
+
+- Implement a ring buffer for payloads that were not sent successfully.
+- A payload should be placed in the buffer when:
+  - network connectivity is temporarily unavailable,
+  - the LTE modem is not ready,
+  - the MQTT session is disconnected,
+  - the broker rejects the publish attempt,
+  - any other send error occurs.
+- Resume sending buffered payloads after connectivity is restored.
+- Preserve payload order while retrying delivery.
+- Define buffer capacity and overflow policy:
+  - preferred policy: drop the oldest records when full and increment a lost-payload counter.
+- Add technical metadata for buffered records:
+  - creation time,
+  - retry count,
+  - last error code,
+  - flag indicating whether the record has already been attempted.
+- Publish or log buffer state:
+  - number of queued records,
+  - number of payloads lost due to overflow,
+  - number of successful retry sends.
+
+## 3. Remote Commands and Device Diagnostics
+
+- Keep support for the `modem_reset` command on the `dpf/cmd` topic.
+- After a modem reset, confirm the device is back online through `dpf/status`.
+- Extend status with useful diagnostic information:
+  - LTE connection state,
+  - MQTT state,
+  - age of the last valid location fix,
+  - payload ring-buffer state.
+- Accept only commands from an explicit supported-command list.
+
+## 4. Raspberry Pi 5 Backend
+
+- Integrate the project with the existing MQTT broker on Raspberry Pi.
+- use the current `dpf/#` topics.
+- Prepare a lightweight collector service:
+  - subscribe to `dpf/#`,
+  - validate payloads,
+  - normalize timestamps,
+  - write raw records to storage.
+- Add an API for reading data and sending commands to the tracker.
+- Add an audit log for commands published to `dpf/cmd`.
+
+## 5. Data Model and Storage
+
+- Use a shared database for multiple telemetry projects, for example TimescaleDB/PostgreSQL or InfluxDB.
+- Store these fields in every record:
+  - `project_id`,
+  - `device_id`,
+  - `topic`,
+  - `event_time_utc`,
+  - `ingest_time_utc`.
+- Split data into tables or measurements:
+  - `telemetry_raw_events`,
+  - `telemetry_features`,
+  - `telemetry_sessions`,
+  - `telemetry_log_sessions`.
+- Enforce `project_id` filtering on every read and write path.
+- Add indexes with `project_id` as the first field.
+- Keep retention and downsampling per project, not globally.
+- project should be updated with backend files as well
+
+## 6. Log Session Detection
+
+- Detect the start of a log session in the backend:
+  - first event after prolonged silence,
+  - first event after an online status.
+- Detect the end of a log session:
+  - explicit offline status, if added to the contract,
+  - broker disconnect information, if available,
+  - timeout after missing data.
+- Store these fields for every session:
+  - `project_id`,
+  - `device_id`,
+  - `log_session_id`,
+  - `start_time_utc`,
+  - `end_time_utc`,
+  - `end_reason`,
+  - counters for messages, gaps, and malformed frames.
+
+## 7. Visualization and Map
+
+- Prepare Grafana dashboards for:
+  - EGT temperatures,
+  - differential pressure,
+  - dosing pump activity,
+  - glow plug state,
+  - modem reset and connectivity events.
+- Show detected regenerations on a timeline.
+- For location data:
+  - draw the route from `cell_lat` and `cell_lng` points,
+  - represent uncertainty using `cell_acc_m`,
+  - color route segments by `cell_speed_kmh`,
+  - mark stale or low-quality points differently.
+- Treat cellular location as operational context, not as an accurate GPS route.
+
+## 8. DPF Data Collection and Analysis
+
+- Collect raw telemetry for several weeks under varied conditions:
+  - city driving,
+  - highway driving,
+  - cold starts,
+  - short trips,
+  - long trips,
+  - varied engine load.
+- Avoid losing information through premature aggregation.
+- Compute derived features in the backend, not in firmware.
+- Add manual annotations for regeneration windows and edge cases.
+- Version feature definitions and detection thresholds.
+
+## 9. Analysis Reports
+
+- Generate a regeneration-session table:
+  - start, end, and duration,
+  - entry and peak temperatures,
+  - dosing pump activity summary,
+  - differential pressure context,
+  - classification: successful, interrupted, failed regeneration.
+- Generate time-aligned plots:
+  - EGT,
+  - dosing pump and glow plugs,
+  - differential pressure,
+  - inferred regeneration state.
+- Compare behavior by driving context:
+  - low-speed urban driving,
+  - steady highway driving,
+  - short cycles with interrupted regeneration.
+- Report log lifecycle metrics:
+  - number of sessions per day and week,
+  - median session length,
+  - dropouts and timeout closures.
+
+## 10. Control Algorithm Reimplementation
+
+- Maintain a candidate DPF control model based on collected data.
+- Working loop:
+  - ingest raw MQTT telemetry,
+  - detect candidate regeneration events,
+  - compute session features and confidence scores,
+  - tune thresholds or model parameters,
+  - version parameter sets,
+  - review deltas before porting them to firmware.
+- Keep stable parameters separate from experimental ones.
+- Store lineage:
+  - firmware version,
+  - analysis code version,
+  - model/threshold version,
+  - date range used for tuning.
+
+## 11. Backend Operations and Reliability
+
+- Preferred deployment: Docker Compose on Raspberry Pi 5.
+- Target services:
+  - existing Mosquitto broker,
+  - collector,
+  - API,
+  - database,
+  - Grafana,
+  - Nginx.
+- Add backups for the database and dashboards.
+- Monitor:
+  - MQTT broker,
+  - queues and latency,
+  - disk space,
+  - service restarts,
+  - dead or malformed payloads.
+- Restrict command-topic writes to the backend account.
+- Add dead-letter handling for payloads that cannot be parsed.
