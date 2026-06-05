@@ -343,7 +343,7 @@ bool modemInit() {
 
   hal_uart_set_tx(modem_serial, PIN_MODEM_TX);
   hal_uart_set_rx(modem_serial, PIN_MODEM_RX);
-  hal_uart_begin(modem_serial, MODEM_BAUD_RATE, SERIAL_8N1);
+  hal_uart_begin(modem_serial, MODEM_BAUD_RATE, HAL_UART_CFG_8N1);
   deb("[UART] Modem serial via JaszczurHAL on GPIO%u/%u @ %lu",
       (unsigned)PIN_MODEM_TX, (unsigned)PIN_MODEM_RX,
       (unsigned long)MODEM_BAUD_RATE);
