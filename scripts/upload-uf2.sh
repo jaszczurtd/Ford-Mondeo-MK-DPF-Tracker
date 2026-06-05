@@ -7,8 +7,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-SETTINGS_FILE="$PROJECT_DIR/.vscode/settings.json"
-BUILD_DIR="$PROJECT_DIR/.build"
+CMAKE_BUILD_DIR="$PROJECT_DIR/.build/cmake"
+UF2_FILE="$PROJECT_DIR/.build/firmware.uf2"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -21,43 +21,23 @@ ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*"; }
 
-# Read settings
-read_setting() {
-    python3 -c "
-import json
-with open('$SETTINGS_FILE') as f:
-    s = json.load(f)
-print(s.get('$1', '${2:-}'))
-" 2>/dev/null
-}
+# Compile through the CMake buildsystem.
+info "Configuring CMake..."
+"$SCRIPT_DIR/configure-cmake.sh"
 
-CLI=$(read_setting "arduino.cliPath" "arduino-cli")
-FQBN=$(read_setting "arduino.fqbn")
-SKETCHBOOK=$(read_setting "arduino.sketchbookPath")
-
-LIB_ARGS=""
-if [[ -n "$SKETCHBOOK" && -d "$SKETCHBOOK/libraries" ]]; then
-    LIB_ARGS="--libraries $SKETCHBOOK/libraries"
-fi
-
-# Compile
-info "Compiling..."
-info "  FQBN: $FQBN"
-if ! $CLI compile --fqbn "$FQBN" --build-path "$BUILD_DIR" $LIB_ARGS \
-    --build-property "compiler.cpp.extra_flags=-I '$PROJECT_DIR'" \
-    --build-property "compiler.c.extra_flags=-I '$PROJECT_DIR'" \
-    "$PROJECT_DIR"; then
+info "Compiling firmware..."
+if ! cmake --build "$CMAKE_BUILD_DIR" --target firmware; then
     err "Compilation failed"
     exit 1
 fi
 
-# Find UF2 artifact
+# Find UF2 artifact.
 echo ""
 info "Searching for UF2 file..."
-UF2=$(find "$BUILD_DIR" -name '*.uf2' -type f | head -1)
+UF2="$UF2_FILE"
 
-if [[ -z "$UF2" ]]; then
-    err "No .uf2 file found in $BUILD_DIR"
+if [[ ! -f "$UF2" ]]; then
+    err "No firmware.uf2 file found at $UF2"
     exit 1
 fi
 

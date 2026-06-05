@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JaszczurHAL.h>
+#include <hal/hal_app.h>
 #include <tools.h>
 #include <Credentials.h>
 
@@ -82,7 +83,5 @@ struct SensorData {
   volatile uint32_t glow_on_duration_ms    = 0;
 };
 
-void setup_1();
-void loop_1();
 bool mqttPublish(const char* topic, const char* payload);
 void handleCriticalFailure(CriticalError err);

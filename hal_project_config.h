@@ -6,11 +6,13 @@
  *
  * This file is automatically picked up by hal_config.h via __has_include.
  * Define HAL_DISABLE_* flags here to exclude unused HAL modules from the
- * build.  Dependency propagation (e.g. EEPROM → KV) is handled by
- * hal_config.h — you only need to disable the base module.
+ * build.  Dependency propagation (e.g. EEPROM -> KV) is handled by
+ * hal_config.h - you only need to disable the base module.
  */
 
-/* ── Modules not used by Mondeo DPF Tracker ──────────────────────────────────────── */
+/* CMake generates setup()/loop() wrapper and calls app_start()/app_task0(). */
+
+/* ── Modules used by Mondeo DPF Tracker ─────────────────────────────────────────── */
 
 #define HAL_ENABLE_CJSON            /* cJSON JSON parser                    */
 #define HAL_ENABLE_THERMOCOUPLE        /* Thermocouple driver (MCP9600)         */

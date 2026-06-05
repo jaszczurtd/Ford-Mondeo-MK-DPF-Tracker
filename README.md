@@ -12,6 +12,17 @@ The firmware also requires a local `Credentials` Arduino library. A template is 
 
 The firmware runs on RP2040, using an rpi-zero board.
 
+## Build
+
+The application uses portable app functions (`app_start()` / `app_task0()`), so there is no hand-written `.ino` file in the repository. CMake generates the small Arduino `setup()` / `loop()` wrapper under `.build/cmake/sketch/` and then calls `arduino-cli`.
+
+```bash
+./scripts/configure-cmake.sh
+cmake --build .build/cmake --target firmware
+```
+
+VS Code tasks use the same CMake targets for build, debug, upload, UF2 upload, and IntelliSense refresh.
+
 ## Board Architecture
 
 The tracker board is built as an RP2040-Zero based telemetry controller with a small set of automotive signal frontends. The RP2040 collects local measurements, timestamps the current operating state, and sends telemetry through an LTE modem to an MQTT broker.

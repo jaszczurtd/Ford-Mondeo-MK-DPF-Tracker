@@ -1,7 +1,7 @@
 /*
- * DPF Regeneration Tracker — Firmware RP2040 (RP2040-Zero)
+ * DPF Regeneration Tracker - Firmware RP2040 (RP2040-Zero)
  * =========================================================
- * v0.4 — RP2040-Zero, RGB NeoPixel LED, watchdog fixes
+ * v0.4 - RP2040-Zero, RGB NeoPixel LED, watchdog fixes
  *
  * Monitors the DPF regeneration system (Mondeo Mk4 2.0 TDCi PSA):
  *   - 2x EGT probe (K-type thermocouple) via MCP9600 (I2C)
@@ -9,14 +9,14 @@
  *   - Fuel dosing pump pulses (GPIO interrupt)
  *   - Vaporizer glow plug state (GPIO interrupt)
  *
- * Sends data over LTE Cat-1 (A7670E) → MQTT/TLS → Mosquitto (RPi5)
+ * Sends data over LTE Cat-1 (A7670E) -> MQTT/TLS -> Mosquitto (RPi5)
  *
  * Pinout:
  *   GPIO0  - I2C0 SDA (MCP9600 x2)
  *   GPIO1  - I2C0 SCL (MCP9600 x2)
  *   GPIO2  - interrupt: dosing pump pulses
  *   GPIO3  - interrupt: glow plug state
- *   GPIO4  - Serial2 TX → modem RX
+ *   GPIO4  - Serial2 TX -> modem RX
  *   GPIO5  - Serial2 RX ← modem TX
  *   GPIO6  - modem power relay
  *   GPIO16 - NeoPixel RGB LED (RP2040-Zero)
@@ -52,7 +52,7 @@ static bool cell_location_valid = false;
 static uint32_t cell_location_last_ok_ms = 0;
 static int cell_location_last_error = HAL_SIMCOM_A76XX_NOT_READY;
 
-// Set from the MQTT message callback; consumed in loop_1() so the hard
+// Set from the MQTT message callback; consumed in app_task0() so the hard
 // reset runs outside the URC dispatch path.
 static volatile bool pending_modem_reset = false;
 
@@ -168,14 +168,14 @@ void isr_glow_plug() {
 // MODEM POWER CONTROL
 // =============================================================
 //
-// The A7670E module on this board has NO PWRKEY broken out — it boots
+// The A7670E module on this board has NO PWRKEY broken out - it boots
 // the moment VCC is applied. Power is gated by an external relay
 // driven from PIN_MODEM_PWR:
 //   HIGH = relay closed = modem powered (idle state)
 //   LOW  = relay open   = modem unpowered
 //
 // That polarity matches hal_simcom_a76xx_power_toggle()'s waveform
-// (idle HIGH → active-LOW pulse → HIGH), so we wire PIN_MODEM_PWR as
+// (idle HIGH -> active-LOW pulse -> HIGH), so we wire PIN_MODEM_PWR as
 // the driver's pwr_pin and reuse the HAL helper for power-cycling.
 // We don't call hal_simcom_a76xx_hard_reset() because it issues two
 // pulses with a 5 s gap (PWRKEY "force off then back on" semantics);
@@ -237,7 +237,7 @@ static void setCriticalError(CriticalError err, const char* msg) {
 // registration) would starve the application watchdog.
 //
 // The driver guarantees this is called at least every ~20 ms.  Runs
-// under the engine mutex — must not touch the modem.
+// under the engine mutex - must not touch the modem.
 static void modemTick(void* user) {
   (void)user;
   hal_watchdog_feed();
@@ -352,7 +352,7 @@ bool modemInit() {
     hal_simcom_a76xx_config_t cfg = {};
     cfg.uart = modem_serial;
     // Wire the power-control relay into the HAL driver: its waveform
-    // (idle HIGH → active-LOW pulse → HIGH) matches our relay polarity,
+    // (idle HIGH -> active-LOW pulse -> HIGH) matches our relay polarity,
     // so modemHardResetRelay() can simply call power_toggle().
     cfg.pwr_pin = PIN_MODEM_PWR;
     cfg.rx_buf = modem_rx_buf;
@@ -614,10 +614,10 @@ error:
 }
 
 // =============================================================
-// SETUP
+// APP START
 // =============================================================
 
-void setup_1() {
+void app_start(void) {
   hal_watchdog_enable(WATCHDOG_TIME, false);
   hal_serial_begin(9600);
   ledInit();
@@ -643,10 +643,10 @@ void setup_1() {
 }
 
 // =============================================================
-// LOOP
+// APP TASK
 // =============================================================
 
-void loop_1() {
+void app_task0(void) {
   uint32_t now = hal_millis();
   char* payload = nullptr;
 
