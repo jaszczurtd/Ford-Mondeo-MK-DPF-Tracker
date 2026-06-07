@@ -162,7 +162,7 @@
             "detail": "Ctrl+Shift+3 - waits for Pico (VID:PID), connects, then reconnects after unplug",
             "type": "shell",
             "command": "python3",
-            "args": ["${workspaceFolder}/scripts/serial-persistent.py", "-m", "pico"],
+            "args": ["${workspaceFolder}/scripts/serial-persistent.py", "-m", "pico", "--replace-existing"],
             "presentation": {
                 "echo": true,
                 "reveal": "always",
