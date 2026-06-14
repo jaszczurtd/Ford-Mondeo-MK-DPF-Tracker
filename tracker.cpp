@@ -25,6 +25,9 @@
 
 #include "tracker.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 // =============================================================
 // GLOBAL VARIABLES
 // =============================================================
@@ -39,6 +42,8 @@ static bool modem_ready = false;
 static bool mqtt_connected = false;
 static uint32_t last_sensor_ms = 0;
 static uint32_t last_publish_ms = 0;
+static uint32_t last_network_time_ms = 0;
+static uint32_t last_gnss_location_ms = 0;
 static uint32_t last_cell_location_ms = 0;
 static uint32_t last_reconnect_ms = 0;
 static uint8_t reconnect_fails = 0;
@@ -51,6 +56,12 @@ static hal_simcom_a76xx_cell_location_t cell_location = {};
 static bool cell_location_valid = false;
 static uint32_t cell_location_last_ok_ms = 0;
 static int cell_location_last_error = HAL_SIMCOM_A76XX_NOT_READY;
+
+static hal_simcom_a76xx_gnss_location_t gnss_location = {};
+static bool gnss_location_valid = false;
+static bool gnss_powered = false;
+static uint32_t gnss_location_last_ok_ms = 0;
+static int gnss_location_last_error = HAL_SIMCOM_A76XX_NOT_READY;
 
 // Set from the MQTT message callback; consumed in app_task0() so the hard
 // reset runs outside the URC dispatch path.
@@ -298,8 +309,46 @@ static bool updateNetworkTime() {
     return false;
   }
 
+  last_network_time_ms = hal_millis();
   deb("[TIME] %s", network_time);
   return true;
+}
+
+// =============================================================
+// GNSS LOCATION
+// =============================================================
+
+static void gnssResetState() {
+  hal_simcom_a76xx_gnss_location_init(&gnss_location);
+  gnss_location_valid = false;
+  gnss_powered = false;
+  last_gnss_location_ms = 0;
+  gnss_location_last_ok_ms = 0;
+  gnss_location_last_error = HAL_SIMCOM_A76XX_NOT_READY;
+}
+
+static hal_simcom_a76xx_result_t updateGnssLocation() {
+  if (modem == nullptr) {
+    return HAL_SIMCOM_A76XX_INVALID_ARG;
+  }
+
+  hal_simcom_a76xx_gnss_location_t loc = {};
+  hal_simcom_a76xx_result_t r =
+      hal_simcom_a76xx_get_gnss_location(modem, &loc, GNSS_QUERY_TIMEOUT_MS);
+  gnss_powered = hal_simcom_a76xx_gnss_is_powered(modem);
+  if (r != HAL_SIMCOM_A76XX_OK) {
+    return r;
+  }
+
+  gnss_location = loc;
+  gnss_location_valid = true;
+  gnss_location_last_ok_ms = hal_millis();
+  gnss_location_last_error = HAL_SIMCOM_A76XX_OK;
+  deb("[GNSS] lat=%.6f lon=%.6f speed=%.2f km/h",
+      gnss_location.latitude_deg,
+      gnss_location.longitude_deg,
+      gnss_location.speed_kmh);
+  return HAL_SIMCOM_A76XX_OK;
 }
 
 static hal_simcom_a76xx_result_t updateCellLocation() {
@@ -381,6 +430,15 @@ bool modemInit() {
   if (hal_simcom_a76xx_init(modem) != HAL_SIMCOM_A76XX_OK) {
     setCriticalError(ERR_MODEM_NO_AT, "No response to AT");
     return false;
+  }
+
+  hal_simcom_a76xx_result_t gr =
+      hal_simcom_a76xx_gnss_power_on(modem, GNSS_ENABLE_TIMEOUT_MS);
+  gnss_powered = hal_simcom_a76xx_gnss_is_powered(modem);
+  if (gr == HAL_SIMCOM_A76XX_OK) {
+    deb("[GNSS] enabled");
+  } else {
+    deb("[GNSS] enable failed (err=%d)", (int)gr);
   }
 
   if (hal_simcom_a76xx_wait_sim_ready(modem, 5000) != HAL_SIMCOM_A76XX_OK) {
@@ -586,6 +644,49 @@ char* buildPayload() {
   NONULL(cJSON_AddNumberToObject(root, "glow", glow ? 1 : 0));
   NONULL(cJSON_AddNumberToObject(root, "glow_dur", glow_dur));
   NONULL(addFixed2Number(root, "mcu_temp", hal_read_chip_temp()));
+  NONULL(cJSON_AddNumberToObject(root, "gnss_valid", gnss_location_valid ? 1 : 0));
+  NONULL(cJSON_AddNumberToObject(root, "gnss_powered", gnss_powered ? 1 : 0));
+  NONULL(cJSON_AddNumberToObject(root, "gnss_error", gnss_location_last_error));
+  if (gnss_location_valid) {
+    NONULL(cJSON_AddNumberToObject(root, "gnss_age_ms", hal_millis() - gnss_location_last_ok_ms));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_lat", gnss_location.latitude_deg));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_lng", gnss_location.longitude_deg));
+    if (gnss_location.speed_kmh >= 0.0) {
+      NONULL(addFixed2Number(root, "gnss_speed_kmh", (float)gnss_location.speed_kmh));
+    } else {
+      NONULL(cJSON_AddNumberToObject(root, "gnss_speed_kmh", -1));
+    }
+    if (gnss_location.altitude_m >= 0.0) {
+      NONULL(addFixed2Number(root, "gnss_alt_m", (float)gnss_location.altitude_m));
+    } else {
+      NONULL(cJSON_AddNumberToObject(root, "gnss_alt_m", -1));
+    }
+    if (gnss_location.course_deg >= 0.0) {
+      NONULL(addFixed2Number(root, "gnss_course_deg", (float)gnss_location.course_deg));
+    } else {
+      NONULL(cJSON_AddNumberToObject(root, "gnss_course_deg", -1));
+    }
+    if (gnss_location.hdop >= 0.0) {
+      NONULL(addFixed2Number(root, "gnss_hdop", (float)gnss_location.hdop));
+    } else {
+      NONULL(cJSON_AddNumberToObject(root, "gnss_hdop", -1));
+    }
+    NONULL(cJSON_AddNumberToObject(root, "gnss_sats_used", gnss_location.satellites_used));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_sats_view", gnss_location.satellites_view));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_fix_mode", gnss_location.fix_mode));
+    if (gnss_location.utc[0]) {
+      NONULL(cJSON_AddStringToObject(root, "gnss_utc", gnss_location.utc));
+    }
+  } else {
+    NONULL(cJSON_AddNumberToObject(root, "gnss_age_ms", -1));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_speed_kmh", -1));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_alt_m", -1));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_course_deg", -1));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_hdop", -1));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_sats_used", -1));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_sats_view", -1));
+    NONULL(cJSON_AddNumberToObject(root, "gnss_fix_mode", -1));
+  }
   NONULL(cJSON_AddNumberToObject(root, "cell_valid", cell_location_valid ? 1 : 0));
   NONULL(cJSON_AddNumberToObject(root, "cell_error", cell_location_last_error));
   if (cell_location_valid) {
@@ -620,6 +721,7 @@ error:
 void app_start(void) {
   hal_watchdog_enable(WATCHDOG_TIME, false);
   hal_serial_begin(9600);
+  hal_serial_set_flush(DEBUG_SERIAL_FLUSH_ENABLED);
   ledInit();
   ledSetStatus(LED_CONNECTING);
   smartDelay(3000);
@@ -628,6 +730,7 @@ void app_start(void) {
   deb(VERSION);
 
   modemPwrInit();
+  gnssResetState();
   sensorsInit();
 
   smartDelay(1500);
@@ -661,6 +764,7 @@ void app_task0(void) {
     pending_modem_reset = false;
     deb("[CMD] executing modem hard reset");
     modemHardResetRelay();
+    gnssResetState();
     cell_location_valid = false;
     cell_location.speed_kmh = -1.0f;
     cell_location_last_ok_ms = 0;
@@ -678,6 +782,19 @@ void app_task0(void) {
     sensorsRead();
   }
 
+  if (modem_ready && (now - last_gnss_location_ms >= GNSS_LOCATION_INTERVAL_MS)) {
+    last_gnss_location_ms = now;
+    hal_simcom_a76xx_result_t gr = updateGnssLocation();
+    if (gr != HAL_SIMCOM_A76XX_OK) {
+      gnss_location_last_error = gr;
+      if (!gnss_location_valid) {
+        deb("[GNSS] fix unavailable (err=%d)", (int)gr);
+      } else {
+        deb("[GNSS] update failed (err=%d), keeping last fix", (int)gr);
+      }
+    }
+  }
+
   if (modem_ready && (now - last_cell_location_ms >= CELL_LOCATION_INTERVAL_MS)) {
     last_cell_location_ms = now;
     hal_simcom_a76xx_result_t lr = updateCellLocation();
@@ -693,7 +810,10 @@ void app_task0(void) {
 
   if (mqtt_connected && (now - last_publish_ms >= MQTT_PUBLISH_INTERVAL)) {
     last_publish_ms = now;
-    updateNetworkTime();
+    if ((network_time[0] == '\0') ||
+        (now - last_network_time_ms >= NETWORK_TIME_INTERVAL_MS)) {
+      updateNetworkTime();
+    }
 
     payload = buildPayload();
     if (payload != nullptr) {
@@ -719,6 +839,7 @@ void app_task0(void) {
 
     if (reconnect_fails >= MAX_RECONNECT_BEFORE_RESET) {
       modemHardResetRelay();
+      gnssResetState();
       cell_location_valid = false;
       cell_location.speed_kmh = -1.0f;
       cell_location_last_ok_ms = 0;
