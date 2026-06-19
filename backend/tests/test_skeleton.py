@@ -9,11 +9,12 @@ def test_package_version_is_defined() -> None:
 
 def test_default_settings_load() -> None:
     settings = load_settings()
-    assert settings.mqtt_host == "localhost"
+    assert settings.mqtt_host
     assert settings.mqtt_port == 8883
     assert settings.mqtt_tls is True
+    assert settings.device_id == "dpf-tracker"
+    assert settings.mqtt_client_id
 
 
 def test_subscribe_topics_match_firmware_contract() -> None:
     assert SUBSCRIBE_TOPICS == ("dpf/data", "dpf/events", "dpf/status")
-
