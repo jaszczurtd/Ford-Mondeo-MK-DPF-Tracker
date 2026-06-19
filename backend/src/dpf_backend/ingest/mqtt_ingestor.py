@@ -16,6 +16,15 @@ from dpf_backend.topics import SUBSCRIBE_TOPICS
 LOG = logging.getLogger("dpf_backend.ingest")
 
 
+def _mqtt_connect_failed(reason_code: Any) -> bool:
+    if hasattr(reason_code, "is_failure"):
+        return bool(reason_code.is_failure)
+    try:
+        return int(reason_code) != 0
+    except (TypeError, ValueError):
+        return str(reason_code) not in {"0", "Success", "Normal disconnection"}
+
+
 def _build_client(settings: Any, store: PostgresStore) -> Any:
     try:
         import paho.mqtt.client as mqtt
@@ -37,7 +46,7 @@ def _build_client(settings: Any, store: PostgresStore) -> Any:
 
     def on_connect(client: Any, userdata: Any, flags: Any, reason_code: Any, properties: Any) -> None:
         del userdata, flags, properties
-        if int(reason_code) != 0:
+        if _mqtt_connect_failed(reason_code):
             LOG.error("MQTT connect failed: %s", reason_code)
             return
         LOG.info("Connected to MQTT %s:%s", settings.mqtt_host, settings.mqtt_port)
@@ -91,4 +100,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
