@@ -73,8 +73,13 @@ Run the ingestor in the foreground:
 
 ```bash
 export DPF_DATABASE_URL='postgresql://dpf_backend:CHANGE_ME@localhost:5432/dpf_backend'
+export DPF_MQTT_HOST='CHANGE_ME_CERT_HOST_OR_IP'
 backend/.venv/bin/dpf-mqtt-ingestor
 ```
+
+When TLS verification is enabled with `DPF_MQTT_CA_FILE`, `DPF_MQTT_HOST` must
+match the hostname or IP address in the Mosquitto certificate. Do not use
+`localhost` unless the certificate is valid for `localhost`.
 
 An example systemd unit is available at
 `backend/deploy/dpf-mqtt-ingestor.service.example`.

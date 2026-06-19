@@ -8,7 +8,7 @@ Type=simple
 User=pi
 WorkingDirectory=/home/pi/Documents/Ford-Mondeo-MK-DPF-Tracker
 Environment=DPF_DATABASE_URL=postgresql://dpf_backend:CHANGE_ME@localhost:5432/dpf_backend
-Environment=DPF_MQTT_HOST=localhost
+Environment=DPF_MQTT_HOST=CHANGE_ME_CERT_HOST_OR_IP
 Environment=DPF_MQTT_PORT=8883
 Environment=DPF_MQTT_TLS=true
 Environment=DPF_MQTT_CLIENT_ID=dpf-backend-ingestor
