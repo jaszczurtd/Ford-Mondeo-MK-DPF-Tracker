@@ -84,7 +84,16 @@ match the hostname or IP address in the Mosquitto certificate. Do not use
 `localhost` unless the certificate is valid for `localhost`.
 
 An example systemd unit is available at
-`backend/deploy/dpf-mqtt-ingestor.service.example`.
+`backend/deploy/dpf-mqtt-ingestor.service.example`. Runtime secrets and host
+settings should live in `/etc/dpf-backend.env`, not in the unit file.
+
+Install the systemd unit on the Raspberry Pi:
+
+```bash
+bash backend/scripts/install_systemd_service.sh /home/pi/Documents/Ford-Mondeo-MK-DPF-Tracker
+sudo systemctl start dpf-mqtt-ingestor
+sudo systemctl status dpf-mqtt-ingestor
+```
 
 ## Boot Sessions
 
