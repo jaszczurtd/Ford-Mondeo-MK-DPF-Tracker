@@ -1,0 +1,21 @@
+[Unit]
+Description=DPF tracker MQTT ingestor
+After=network-online.target postgresql.service mosquitto.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Documents/Ford-Mondeo-MK-DPF-Tracker
+Environment=DPF_DATABASE_URL=postgresql://dpf_backend:CHANGE_ME@localhost:5432/dpf_backend
+Environment=DPF_MQTT_HOST=localhost
+Environment=DPF_MQTT_PORT=8883
+Environment=DPF_MQTT_TLS=true
+Environment=DPF_MQTT_CLIENT_ID=dpf-backend-ingestor
+Environment=DPF_DEVICE_ID=dpf-tracker
+ExecStart=/home/pi/Documents/Ford-Mondeo-MK-DPF-Tracker/backend/.venv/bin/dpf-mqtt-ingestor
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
