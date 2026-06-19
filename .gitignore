@@ -1,4 +1,3 @@
-
 # Arduino / RP2040 build output
 .build/
 build/
@@ -55,11 +54,31 @@ hal_project_secrets.h
 
 # Logs and temporary files
 *.log
+logs/
 *.tmp
 *.temp
 *.swp
 *.swo
 *~
+
+# Python / backend local artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+dist/
+backend/data/
+backend/logs/
+*.db
+*.sqlite
+*.sqlite3
 
 # OS metadata
 .DS_Store
@@ -69,3 +88,4 @@ Thumbs.db
 .agents/
 .codex/
 *codex*
+AGENTS.md

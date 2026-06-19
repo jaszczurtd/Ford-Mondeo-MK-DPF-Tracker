@@ -11,7 +11,7 @@
 // =============================================================
 
 #define WATCHDOG_TIME 7000
-#define VERSION  "v0.4"
+#define VERSION  "v0.5"
 
 #define DEBUG_SERIAL_FLUSH_ENABLED false
 #define MODEM_BAUD_RATE 115200UL
@@ -20,6 +20,7 @@
 #define MQTT_TOPIC_DATA   "dpf/data"
 #define MQTT_TOPIC_STATUS "dpf/status"
 #define MQTT_TOPIC_CMD    "dpf/cmd"
+#define MQTT_TOPIC_EVENTS "dpf/events"
 #define MQTT_CMD_MODEM_RESET "modem_reset"
 #define MQTT_KEEPALIVE    120
 #define MQTT_CLIENT_INDEX 0
@@ -43,6 +44,12 @@
 
 #define SENSOR_INTERVAL_MS     500
 #define MQTT_PUBLISH_INTERVAL  2000
+#define DATA_PUBLISH_DRAIN_INTERVAL_MS 250
+#define DATA_QUEUE_CAPACITY    64
+#define DATA_PAYLOAD_MAX_SIZE  1536
+#define EVENT_PUBLISH_INTERVAL_MS 500
+#define EVENT_QUEUE_CAPACITY   1024
+#define EVENT_PUBLISH_BATCH_MAX 32
 #define NETWORK_TIME_INTERVAL_MS 60000
 #define GNSS_LOCATION_INTERVAL_MS 5000
 #define GNSS_ENABLE_TIMEOUT_MS 3000
@@ -80,6 +87,10 @@ struct SensorData {
   volatile uint32_t pump_pulse_count = 0;
   volatile uint32_t pump_last_us     = 0;
   volatile uint32_t pump_period_us   = 0;
+  volatile bool pump_state           = false;
+  volatile uint32_t pump_on_us       = 0;
+  volatile uint32_t pump_off_us      = 0;
+  volatile uint32_t pump_on_duration_ms = 0;
   float pump_freq_hz  = 0.0f;
 
   volatile bool glow_state        = false;
