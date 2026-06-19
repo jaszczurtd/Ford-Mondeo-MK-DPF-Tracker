@@ -17,7 +17,7 @@ point.
 
 ## Current Stage
 
-Stage 3 provides:
+Stage 4 provides:
 
 - Python package layout under `src/dpf_backend/`.
 - Configuration loader based on environment variables.
@@ -30,6 +30,8 @@ Stage 3 provides:
 - PostgreSQL storage path for raw and normalized records.
 - MQTT ingestor CLI entry point.
 - Sample ingestion script for database verification without MQTT.
+- Online boot/session detection for newly ingested records.
+- `boot_session_id` assignment for telemetry, actuator, and status rows.
 
 ## Database Migrations
 
@@ -83,6 +85,19 @@ match the hostname or IP address in the Mosquitto certificate. Do not use
 
 An example systemd unit is available at
 `backend/deploy/dpf-mqtt-ingestor.service.example`.
+
+## Boot Sessions
+
+The ingestor assigns new normalized rows to `boot_sessions`. A new session is
+started when the backend sees one of these restart signals:
+
+- first message for a device,
+- watchdog reset status,
+- firmware uptime `ms` drops,
+- actuator event `seq` drops,
+- long wall-clock gap followed by small firmware uptime.
+
+Existing rows collected before Stage 4 may still have `boot_session_id = NULL`.
 
 ## Verification
 

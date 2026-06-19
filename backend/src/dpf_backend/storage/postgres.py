@@ -15,6 +15,12 @@ from dpf_backend.ingest.models import (
     TelemetryRecord,
 )
 from dpf_backend.ingest.parser import bool_field
+from dpf_backend.storage.session import (
+    CurrentSession,
+    SessionObservation,
+    decide_session,
+    observation_from_message,
+)
 
 
 def _json_dumps(value: Any) -> str:
@@ -57,12 +63,15 @@ class PostgresStore(AbstractContextManager["PostgresStore"]):
 
         with self.conn.transaction():
             raw_id = self._insert_raw(message.raw)
+            boot_session_id = self._resolve_boot_session(
+                observation_from_message(message)
+            )
             if message.telemetry is not None:
-                self._insert_telemetry(raw_id, message.telemetry)
+                self._insert_telemetry(raw_id, boot_session_id, message.telemetry)
             for event in message.actuator_events:
-                self._insert_actuator_event(raw_id, event)
+                self._insert_actuator_event(raw_id, boot_session_id, event)
             if message.status is not None:
-                self._insert_status(raw_id, message.status)
+                self._insert_status(raw_id, boot_session_id, message.status)
         return raw_id
 
     def _insert_raw(self, record: RawMqttRecord) -> int:
@@ -89,13 +98,131 @@ class PostgresStore(AbstractContextManager["PostgresStore"]):
         ).fetchone()
         return int(row[0])
 
-    def _insert_telemetry(self, raw_id: int, record: TelemetryRecord) -> None:
+    def _resolve_boot_session(self, observation: SessionObservation) -> int:
+        current = self._latest_session(observation.device_id)
+        decision = decide_session(current, observation)
+        if decision.start_new:
+            if current is not None:
+                self._close_session(current.id, observation.received_at)
+            return self._create_session(observation, decision.reason)
+
+        assert current is not None
+        self._update_session(current, observation)
+        return current.id
+
+    def _latest_session(self, device_id: str) -> CurrentSession | None:
+        assert self.conn is not None
+        row = self.conn.execute(
+            """
+            SELECT id, device_id, started_at, updated_at, last_device_ms,
+                   last_event_seq
+            FROM boot_sessions
+            WHERE device_id = %s
+            ORDER BY started_at DESC, id DESC
+            LIMIT 1
+            """,
+            (device_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return CurrentSession(
+            id=int(row[0]),
+            device_id=row[1],
+            started_at=row[2],
+            updated_at=row[3],
+            last_device_ms=row[4],
+            last_event_seq=row[5],
+        )
+
+    def _close_session(self, session_id: int, ended_at: Any) -> None:
+        assert self.conn is not None
+        self.conn.execute(
+            """
+            UPDATE boot_sessions
+            SET ended_at = %s, updated_at = %s
+            WHERE id = %s AND ended_at IS NULL
+            """,
+            (ended_at, ended_at, session_id),
+        )
+
+    def _create_session(self, observation: SessionObservation, reason: str) -> int:
+        assert self.conn is not None
+        row = self.conn.execute(
+            """
+            INSERT INTO boot_sessions (
+                device_id, started_at, first_device_ms, last_device_ms,
+                first_event_seq, last_event_seq, start_reason, watchdog_reset,
+                updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                observation.device_id,
+                observation.received_at,
+                observation.device_ms,
+                observation.device_ms,
+                observation.min_event_seq,
+                observation.max_event_seq,
+                reason,
+                observation.watchdog_reset,
+                observation.received_at,
+            ),
+        ).fetchone()
+        return int(row[0])
+
+    def _update_session(
+        self,
+        current: CurrentSession,
+        observation: SessionObservation,
+    ) -> None:
+        assert self.conn is not None
+        last_device_ms = current.last_device_ms
+        if observation.device_ms is not None:
+            last_device_ms = (
+                observation.device_ms
+                if last_device_ms is None
+                else max(last_device_ms, observation.device_ms)
+            )
+
+        last_event_seq = current.last_event_seq
+        if observation.max_event_seq is not None:
+            last_event_seq = (
+                observation.max_event_seq
+                if last_event_seq is None
+                else max(last_event_seq, observation.max_event_seq)
+            )
+
+        self.conn.execute(
+            """
+            UPDATE boot_sessions
+            SET last_device_ms = %s,
+                last_event_seq = %s,
+                watchdog_reset = watchdog_reset OR %s,
+                updated_at = %s
+            WHERE id = %s
+            """,
+            (
+                last_device_ms,
+                last_event_seq,
+                observation.watchdog_reset,
+                observation.received_at,
+                current.id,
+            ),
+        )
+
+    def _insert_telemetry(
+        self,
+        raw_id: int,
+        boot_session_id: int,
+        record: TelemetryRecord,
+    ) -> None:
         assert self.conn is not None
         p = record.payload
         self.conn.execute(
             """
             INSERT INTO telemetry_data (
-                raw_mqtt_id, received_at, device_id, firmware_version,
+                raw_mqtt_id, boot_session_id, received_at, device_id, firmware_version,
                 firmware_time, device_ms, egt_pre, egt_mid, dp_voltage,
                 dp_raw, pump_onoff_period, pump_freq_hz, pump_cnt, pump_state,
                 pump_period_ms, pump_last_on_ms, pump_current_on_ms,
@@ -110,12 +237,13 @@ class PostgresStore(AbstractContextManager["PostgresStore"]):
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s::jsonb
             )
             """,
             (
                 raw_id,
+                boot_session_id,
                 record.received_at,
                 record.device_id,
                 _get(p, "version"),
@@ -165,14 +293,19 @@ class PostgresStore(AbstractContextManager["PostgresStore"]):
             ),
         )
 
-    def _insert_actuator_event(self, raw_id: int, record: ActuatorEventRecord) -> None:
+    def _insert_actuator_event(
+        self,
+        raw_id: int,
+        boot_session_id: int,
+        record: ActuatorEventRecord,
+    ) -> None:
         assert self.conn is not None
         b = record.batch_payload
         e = record.event_payload
         self.conn.execute(
             """
             INSERT INTO actuator_events (
-                raw_mqtt_id, received_at, device_id, firmware_version,
+                raw_mqtt_id, boot_session_id, received_at, device_id, firmware_version,
                 batch_device_ms, batch_count, queue_len,
                 queue_remaining_after_batch, overflow_count, seq, t_us, t_ms,
                 source, state, gnss_speed_kmh, dp_voltage, dp_sample_age_ms,
@@ -180,11 +313,12 @@ class PostgresStore(AbstractContextManager["PostgresStore"]):
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s::jsonb, %s::jsonb
+                %s, %s, %s::jsonb, %s::jsonb
             )
             """,
             (
                 raw_id,
+                boot_session_id,
                 record.received_at,
                 record.device_id,
                 _get(b, "version"),
@@ -206,19 +340,25 @@ class PostgresStore(AbstractContextManager["PostgresStore"]):
             ),
         )
 
-    def _insert_status(self, raw_id: int, record: StatusRecord) -> None:
+    def _insert_status(
+        self,
+        raw_id: int,
+        boot_session_id: int,
+        record: StatusRecord,
+    ) -> None:
         assert self.conn is not None
         p = record.payload
         self.conn.execute(
             """
             INSERT INTO status_events (
-                raw_mqtt_id, received_at, device_id, firmware_version,
+                raw_mqtt_id, boot_session_id, received_at, device_id, firmware_version,
                 device_ms, status, reason, watchdog_reset, payload
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
             """,
             (
                 raw_id,
+                boot_session_id,
                 record.received_at,
                 record.device_id,
                 _get(p, "version"),
@@ -229,4 +369,3 @@ class PostgresStore(AbstractContextManager["PostgresStore"]):
                 _json_dumps(p),
             ),
         )
-

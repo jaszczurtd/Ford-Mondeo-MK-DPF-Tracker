@@ -94,7 +94,10 @@ def main() -> int:
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    run()
+    try:
+        run()
+    except KeyboardInterrupt:
+        LOG.info("Stopped by keyboard interrupt")
     return 0
 
 
