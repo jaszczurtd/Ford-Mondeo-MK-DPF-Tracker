@@ -17,6 +17,8 @@ REQUIRED_TABLES = {
     "status_events",
 }
 
+EXPECTED_MIGRATIONS = ("001_initial_schema.sql", "002_telemetry_windows.sql")
+
 
 def main() -> int:
     migrations_dir = Path(__file__).resolve().parents[1] / "db" / "migrations"
@@ -29,6 +31,10 @@ def main() -> int:
     if names != sorted(names):
         print("Migration files are not sorted", file=sys.stderr)
         return 1
+    for expected in EXPECTED_MIGRATIONS:
+        if expected not in names:
+            print(f"Missing migration file: {expected}", file=sys.stderr)
+            return 1
 
     first = files[0].read_text(encoding="utf-8")
     missing = [
@@ -42,6 +48,14 @@ def main() -> int:
 
     if "INSERT INTO schema_migrations" not in first:
         print("Migration does not record itself in schema_migrations", file=sys.stderr)
+        return 1
+
+    second = (migrations_dir / "002_telemetry_windows.sql").read_text(encoding="utf-8")
+    if "CREATE TABLE IF NOT EXISTS telemetry_windows" not in second:
+        print("Migration 002 does not create telemetry_windows", file=sys.stderr)
+        return 1
+    if "002_telemetry_windows" not in second:
+        print("Migration 002 does not record itself", file=sys.stderr)
         return 1
 
     print(f"Validated {len(files)} migration file(s): {', '.join(names)}")

@@ -3,8 +3,8 @@
 Backend services for the Ford Mondeo MK4 DPF tracker.
 
 The backend is built in stages. Current code includes the project skeleton,
-database schema, MQTT parsing, PostgreSQL storage, and an MQTT ingestor entry
-point.
+database schema, MQTT parsing, PostgreSQL storage, an MQTT ingestor entry point,
+boot/session detection, and analytical telemetry windows.
 
 ## Planned Services
 
@@ -17,7 +17,7 @@ point.
 
 ## Current Stage
 
-Stage 4 provides:
+Stage 5 provides:
 
 - Python package layout under `src/dpf_backend/`.
 - Configuration loader based on environment variables.
@@ -32,6 +32,8 @@ Stage 4 provides:
 - Sample ingestion script for database verification without MQTT.
 - Online boot/session detection for newly ingested records.
 - `boot_session_id` assignment for telemetry, actuator, and status rows.
+- `telemetry_windows` aggregates for 10 second and 60 second analysis windows.
+- `refresh_windows.py` to rebuild analytical windows from normalized data.
 
 ## Database Migrations
 
@@ -108,6 +110,24 @@ started when the backend sees one of these restart signals:
 
 Existing rows collected before Stage 4 may still have `boot_session_id = NULL`.
 
+## Analytical Windows
+
+Refresh all supported window sizes:
+
+```bash
+PYTHONPATH=backend/src backend/.venv/bin/python backend/scripts/refresh_windows.py
+```
+
+Refresh a single window size:
+
+```bash
+PYTHONPATH=backend/src backend/.venv/bin/python backend/scripts/refresh_windows.py --bucket-seconds 10
+```
+
+The resulting `telemetry_windows` rows include temperature, differential
+pressure, speed, pump/glow activity counts, queue overflow flags, and simple
+slope metrics for agent and visualization use.
+
 ## Verification
 
 From the repository root:
@@ -119,4 +139,5 @@ python3 backend/scripts/run_unit_tests.py
 python3 backend/scripts/validate_migrations.py
 PYTHONPATH=backend/src python3 -m dpf_backend.ingest.mqtt_ingestor --help
 PYTHONPATH=backend/src python3 backend/scripts/ingest_sample.py --help
+PYTHONPATH=backend/src python3 backend/scripts/refresh_windows.py --help
 ```
