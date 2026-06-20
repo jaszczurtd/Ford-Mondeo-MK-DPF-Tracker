@@ -4,7 +4,7 @@ Backend services for the Ford Mondeo MK4 DPF tracker.
 
 The backend is built in stages. Current code includes the project skeleton,
 database schema, MQTT parsing, PostgreSQL storage, an MQTT ingestor entry point,
-boot/session detection, and analytical telemetry windows.
+boot/session detection, analytical telemetry windows, and a read-only HTTP API.
 
 ## Planned Services
 
@@ -17,7 +17,7 @@ boot/session detection, and analytical telemetry windows.
 
 ## Current Stage
 
-Stage 5 provides:
+Stage 6 provides:
 
 - Python package layout under `src/dpf_backend/`.
 - Configuration loader based on environment variables.
@@ -34,6 +34,8 @@ Stage 5 provides:
 - `boot_session_id` assignment for telemetry, actuator, and status rows.
 - `telemetry_windows` aggregates for 10 second and 60 second analysis windows.
 - `refresh_windows.py` to rebuild analytical windows from normalized data.
+- Read-only FastAPI API for health/status, recent raw MQTT records, telemetry,
+  analytical windows, and boot sessions.
 
 ## Database Migrations
 
@@ -128,6 +130,39 @@ The resulting `telemetry_windows` rows include temperature, differential
 pressure, speed, pump/glow activity counts, queue overflow flags, and simple
 slope metrics for agent and visualization use.
 
+## HTTP API
+
+Install the backend package with web dependencies:
+
+```bash
+python3 -m venv backend/.venv
+backend/.venv/bin/pip install -e backend
+```
+
+Run the API in the foreground:
+
+```bash
+set -a
+. /etc/dpf-backend.env
+set +a
+backend/.venv/bin/dpf-api
+```
+
+By default the API listens on `127.0.0.1:8080`, controlled by `DPF_API_HOST`
+and `DPF_API_PORT`.
+
+Stage 6 endpoints:
+
+- `GET /health` - process health and backend version, no database query.
+- `GET /status` - database row counts and latest ingest timestamps.
+- `GET /raw-mqtt/recent?limit=20` - recent raw MQTT rows.
+- `GET /telemetry?limit=100&from=2026-06-20T10:00:00Z&to=2026-06-20T11:00:00Z` - normalized telemetry rows.
+- `GET /windows?bucket_seconds=10&limit=100` - analytical telemetry windows.
+- `GET /boot-sessions?limit=20` - recent boot/session records.
+
+The API is read-only in Stage 6. Command publishing to `dpf/cmd` and command
+audit logging should be added later, after read-only access is stable.
+
 ## Verification
 
 From the repository root:
@@ -140,4 +175,5 @@ python3 backend/scripts/validate_migrations.py
 PYTHONPATH=backend/src python3 -m dpf_backend.ingest.mqtt_ingestor --help
 PYTHONPATH=backend/src python3 backend/scripts/ingest_sample.py --help
 PYTHONPATH=backend/src python3 backend/scripts/refresh_windows.py --help
+PYTHONPATH=backend/src python3 -m dpf_backend.api.server --help
 ```

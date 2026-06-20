@@ -90,39 +90,119 @@ The modem is also used as the source for network time, GNSS location, and cellul
 
 Telemetry is sampled as compact JSON every 2 seconds and queued in RAM for `dpf/data`. While MQTT is connected, the firmware drains this queue and removes each payload only after a successful publish. This keeps short MQTT outages from creating gaps in the slow temperature/pressure trend.
 
-Core payload fields:
+Example `dpf/data` payload:
 
-- `version` - firmware version.
-- `time` - modem/network time when available.
-- `egt_pre`, `egt_mid` - pre-DPF and mid-DPF exhaust gas temperatures.
-- `dp_voltage`, `dp_raw` - DPF differential pressure sensor voltage and raw ADC value.
-- `pump_onoff_period`, `pump_freq_hz`, `pump_cnt` - dosing pump frequency estimate and pulse count since the previous payload.
-- `pump`, `pump_period_ms`, `pump_last_on_ms`, `pump_current_on_ms` - current pump state and ON timing.
-- `glow`, `glow_dur`, `glow_current_on_ms` - vaporizer glow plug state and ON timing.
-- `mcu_temp` - RP2040 internal temperature.
-- `data_queue_len`, `data_overflow_count` - current state of the RAM telemetry queue.
-- `event_queue_len`, `event_overflow_count` - current state of the RAM event queue.
-- `ms` - firmware uptime in milliseconds.
+```jsonc
+{
+  "version": "v0.4",                 // Firmware version.
+  "time": "2026-06-19T18:42:10+02:00", // Modem/network time when available.
+  "egt_pre": 312.45,                 // Pre-DPF exhaust gas temperature, C.
+  "egt_mid": 287.12,                 // Mid-DPF exhaust gas temperature, C.
+  "dp_voltage": 1.42,                // DPF differential pressure sensor voltage.
+  "dp_raw": 1762,                    // Raw ADC value for the pressure input.
+  "pump_onoff_period": 2.5,          // Dosing pump frequency estimate from ON/OFF timing.
+  "pump_freq_hz": 2.5,               // Dosing pump frequency estimate in Hz.
+  "pump_cnt": 5,                     // Pump ON edge count since the previous payload.
+  "pump": 1,                         // Current pump state: 1 = ON, 0 = OFF.
+  "pump_period_ms": 400,             // Period between recent pump ON edges.
+  "pump_last_on_ms": 82,             // Last completed pump ON duration.
+  "pump_current_on_ms": 37,          // Current pump ON duration when pump is ON.
+  "glow": 1,                         // Current vaporizer glow plug state: 1 = ON, 0 = OFF.
+  "glow_dur": 1400,                  // Last completed glow plug ON duration.
+  "glow_current_on_ms": 6200,        // Current glow plug ON duration when glow is ON.
+  "mcu_temp": 42.38,                 // RP2040 internal temperature, C.
+  "data_queue_len": 3,               // Number of queued dpf/data payloads in RAM.
+  "data_overflow_count": 0,          // Dropped dpf/data payload count due to RAM queue overflow.
+  "event_queue_len": 12,             // Number of queued dpf/events records in RAM.
+  "event_overflow_count": 0,         // Dropped event count due to RAM queue overflow.
+  "gnss_valid": 1,                   // GNSS fix validity: 1 = valid, 0 = invalid.
+  "gnss_powered": 1,                 // GNSS power state: 1 = powered, 0 = off/unavailable.
+  "gnss_error": 0,                   // GNSS read/status error code.
+  "gnss_age_ms": 850,                // Age of the latest GNSS fix.
+  "gnss_lat": 52.2297,               // GNSS latitude when valid.
+  "gnss_lng": 21.0122,               // GNSS longitude when valid.
+  "gnss_speed_kmh": 74.32,           // GNSS speed.
+  "gnss_alt_m": 112.5,               // GNSS altitude.
+  "gnss_course_deg": 184.2,          // GNSS course over ground.
+  "gnss_hdop": 0.9,                  // GNSS horizontal dilution of precision.
+  "gnss_sats_used": 9,               // Satellites used for the fix.
+  "gnss_sats_view": 15,              // Satellites visible.
+  "gnss_fix_mode": 3,                // GNSS fix mode reported by the modem.
+  "gnss_utc": "164210.000",          // GNSS UTC time when provided by the fix.
+  "cell_valid": 1,                   // Cellular location validity: 1 = valid, 0 = invalid.
+  "cell_error": 0,                   // Cellular location error code.
+  "cell_age_ms": 4200,               // Age of the latest cellular location estimate.
+  "cell_speed_kmh": 72.1,            // Cellular location speed estimate.
+  "cell_lat": 52.2301,               // Cellular location latitude when valid.
+  "cell_lng": 21.0118,               // Cellular location longitude when valid.
+  "cell_acc_m": 550,                 // Cellular location accuracy estimate in meters.
+  "ms": 1234567                      // Firmware uptime in milliseconds.
+}
+```
 
-GNSS fields include `gnss_valid`, `gnss_powered`, `gnss_error`, `gnss_age_ms`, `gnss_lat`, `gnss_lng`, `gnss_speed_kmh`, `gnss_alt_m`, `gnss_course_deg`, `gnss_hdop`, `gnss_sats_used`, `gnss_sats_view`, `gnss_fix_mode`, and `gnss_utc` when a fix has UTC data.
+Cellular location is approximate operating context, not a precise GPS route. Some GNSS and cellular location fields are omitted or set to unavailable values when no valid fix is available.
 
-Cellular location fields include `cell_valid`, `cell_error`, `cell_age_ms`, `cell_speed_kmh`, and, when a cellular location is valid, `cell_lat`, `cell_lng`, and `cell_acc_m`. Cellular location is approximate operating context, not a precise GPS route.
+Fast control-signal transitions are queued separately in a RAM ring buffer and published to `dpf/events` in batches. Events are removed from the queue only after a successful MQTT publish, so short MQTT outages do not lose pump/glow edge timing.
 
-Fast control-signal transitions are queued separately in a RAM ring buffer and published to `dpf/events` in batches. Events are removed from the queue only after a successful MQTT publish, so short MQTT outages do not lose pump/glow edge timing. Each event contains:
+Example `dpf/events` payload:
 
-- `seq` - monotonic event sequence number.
-- `t_us`, `t_ms` - firmware timestamp of the edge.
-- `src` - `pump` or `glow`.
-- `state` - `1` for ON, `0` for OFF.
-- `gnss_speed_kmh` - latest GNSS vehicle speed captured when the edge was recorded, or `-1` when unavailable.
-- `dp_voltage` - latest DPF differential pressure sensor voltage captured when the edge was recorded.
-- `dp_sample_age_ms` - age of the `dp_voltage` sample at the event timestamp, or `-1` when unavailable.
+```jsonc
+{
+  "version": "v0.4",                 // Firmware version.
+  "ms": 1234600,                     // Firmware uptime when this batch was prepared.
+  "batch_count": 2,                  // Number of events in this MQTT batch.
+  "queue_len": 2,                    // Queue length before or at batch preparation.
+  "queue_remaining_after_batch": 0,  // Events still queued after this batch is published.
+  "overflow_count": 0,               // Dropped event count due to RAM queue overflow.
+  "events": [
+    {
+      "seq": 1201,                   // Monotonic event sequence number.
+      "t_us": 1234100123,            // Firmware timestamp of the edge, microseconds.
+      "t_ms": 1234100,               // Firmware timestamp of the edge, milliseconds.
+      "src": "glow",                 // Event source: "pump" or "glow".
+      "state": 1,                    // Edge state: 1 = ON, 0 = OFF.
+      "gnss_speed_kmh": 74.32,       // Latest GNSS speed at the edge, or -1 if unavailable.
+      "dp_voltage": 1.42,            // Latest sampled DPF pressure sensor voltage.
+      "dp_sample_age_ms": 37         // Age of dp_voltage at the edge, or -1 if unavailable.
+    },
+    {
+      "seq": 1202,
+      "t_us": 1234123456,
+      "t_ms": 1234123,
+      "src": "pump",
+      "state": 1,
+      "gnss_speed_kmh": 74.32,
+      "dp_voltage": 1.43,
+      "dp_sample_age_ms": 81
+    }
+  ]
+}
+```
 
 The telemetry queue stores up to `DATA_QUEUE_CAPACITY` fixed-size payload slots, each limited by `DATA_PAYLOAD_MAX_SIZE`. The event batch also includes `queue_len`, `queue_remaining_after_batch`, and `overflow_count`. Both queues are finite; if either fills during a long outage, its overflow counter records that the in-RAM buffer was exhausted.
 
 DPF regeneration cycle detection should be done by combining both streams. `dpf/data` is the regular slow telemetry stream for pressure, temperature, location, and long-term state trends. `dpf/events` is the precise actuator edge stream for reconstructing pump and glow plug timing. Start/end conditions should primarily come from the pressure and temperature trends in `dpf/data`, while `dpf/events` describes what the factory controller did during that cycle.
 
-The status topic `dpf/status` publishes `{"status":"online"}` after MQTT connection. If the previous application boot was caused by a real watchdog timeout, the firmware also publishes one watchdog status payload, for example `{"status":"watchdog_reset","reason":"watchdog","version":"v0.4","ms":12345}`. Other reset causes are not reported as status events. The command topic `dpf/cmd` accepts the plain text command `modem_reset`.
+The status topic `dpf/status` publishes an online payload after MQTT connection:
+
+```jsonc
+{
+  "status": "online"                 // Tracker is connected to MQTT and publishing.
+}
+```
+
+If the previous application boot was caused by a real watchdog timeout, the firmware also publishes one watchdog status payload:
+
+```jsonc
+{
+  "status": "watchdog_reset",        // Status event type.
+  "reason": "watchdog",              // Reset reason reported by firmware.
+  "version": "v0.4",                 // Firmware version.
+  "ms": 12345                        // Firmware uptime when the status was published.
+}
+```
+
+Other reset causes are not reported as status events. The command topic `dpf/cmd` accepts the plain text command `modem_reset`.
 
 ## Thermocouples
 
