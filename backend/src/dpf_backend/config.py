@@ -4,6 +4,35 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
+
+
+DEFAULT_ENV_FILE = "/etc/dpf-backend.env"
+
+
+def _strip_env_value(raw: str) -> str:
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def load_env_file(path: str | os.PathLike[str] | None = None) -> None:
+    """Load KEY=value settings from an env file without overriding os.environ."""
+
+    env_path = Path(path or os.getenv("DPF_ENV_FILE", DEFAULT_ENV_FILE))
+    if not env_path.exists():
+        return
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, raw_value = stripped.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        os.environ[key] = _strip_env_value(raw_value)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -29,7 +58,9 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    """Load backend settings from environment variables."""
+    """Load backend settings from /etc/dpf-backend.env and environment variables."""
+
+    load_env_file()
 
     return Settings(
         device_id=os.getenv("DPF_DEVICE_ID", "dpf-tracker"),
@@ -45,5 +76,5 @@ def load_settings() -> Settings:
             "postgresql://dpf_backend:dpf_backend@localhost:5432/dpf_backend",
         ),
         api_host=os.getenv("DPF_API_HOST", "127.0.0.1"),
-        api_port=int(os.getenv("DPF_API_PORT", "8080")),
+        api_port=int(os.getenv("DPF_API_PORT", "8090")),
     )

@@ -20,7 +20,8 @@ boot/session detection, analytical telemetry windows, and a read-only HTTP API.
 Stage 6 provides:
 
 - Python package layout under `src/dpf_backend/`.
-- Configuration loader based on environment variables.
+- Configuration loader based on `/etc/dpf-backend.env` and environment
+  variables.
 - Placeholder modules for ingest, storage, analyzer, and API layers.
 - Local verification that the package imports and compiles.
 - PostgreSQL migration SQL under `db/migrations/`.
@@ -142,14 +143,14 @@ backend/.venv/bin/pip install -e backend
 Run the API in the foreground:
 
 ```bash
-set -a
-. /etc/dpf-backend.env
-set +a
 backend/.venv/bin/dpf-api
 ```
 
-By default the API listens on `127.0.0.1:8080`, controlled by `DPF_API_HOST`
+By default the API listens on `127.0.0.1:8090`, controlled by `DPF_API_HOST`
 and `DPF_API_PORT`.
+
+The backend loads `/etc/dpf-backend.env` automatically when it exists. Values
+already exported in the shell take precedence over the file.
 
 Stage 6 endpoints:
 
