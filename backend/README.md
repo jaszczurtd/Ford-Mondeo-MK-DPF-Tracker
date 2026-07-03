@@ -164,6 +164,30 @@ Stage 6 endpoints:
 The API is read-only in Stage 6. Command publishing to `dpf/cmd` and command
 audit logging should be added later, after read-only access is stable.
 
+## Raspberry Pi Diagnostics
+
+Run the deployment diagnostic from the repository root on the Raspberry Pi:
+
+```bash
+backend/.venv/bin/python backend/scripts/diagnose_pi.py
+```
+
+The script checks `/etc/dpf-backend.env`, required commands, PostgreSQL
+connectivity, migrations, required tables, row counts, ingest freshness,
+boot-session assignment, analytical windows, the `dpf-mqtt-ingestor` systemd
+service, and the read-only API endpoints on `DPF_API_HOST:DPF_API_PORT`.
+
+Useful variants:
+
+```bash
+backend/.venv/bin/python backend/scripts/diagnose_pi.py --skip-api
+backend/.venv/bin/python backend/scripts/diagnose_pi.py --skip-systemd
+backend/.venv/bin/python backend/scripts/diagnose_pi.py --strict-warnings
+```
+
+The script returns non-zero when a `FAIL` is reported. Warnings remain a zero
+exit by default, unless `--strict-warnings` is used.
+
 ## Verification
 
 From the repository root:
@@ -177,4 +201,5 @@ PYTHONPATH=backend/src python3 -m dpf_backend.ingest.mqtt_ingestor --help
 PYTHONPATH=backend/src python3 backend/scripts/ingest_sample.py --help
 PYTHONPATH=backend/src python3 backend/scripts/refresh_windows.py --help
 PYTHONPATH=backend/src python3 -m dpf_backend.api.server --help
+PYTHONPATH=backend/src python3 backend/scripts/diagnose_pi.py --help
 ```
