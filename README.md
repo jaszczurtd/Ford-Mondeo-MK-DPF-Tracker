@@ -8,7 +8,9 @@ Author: Marcin "Jaszczur" Kielesinski.
 
 This project requires [JaszczurHAL](https://github.com/jaszczurtd/JaszczurHAL).
 
-The firmware also requires a local `Credentials` Arduino library. A template is included in this project tree under `Credentials/`; for a normal Arduino build it should be placed in the sketchbook libraries directory as `libraries/Credentials`, matching Arduino's library discovery rules.
+The firmware uses the shared `../libraries/Credentials` Arduino library. The
+`Credentials/` directory in this project is only a template/example and is not
+part of the active build.
 
 The physical tracker uses a Waveshare RP2040-Zero module. In practice the firmware only depends on RP2040 peripherals used through Arduino/JaszczurHAL, so it also builds and runs with compatible RP2040 board definitions such as Raspberry Pi Pico. Select the FQBN that matches the board support package and upload method used on the development machine.
 
@@ -16,31 +18,23 @@ The physical tracker uses a Waveshare RP2040-Zero module. In practice the firmwa
 
 The application uses portable app functions (`app_start()` / `app_task0()`), so there is no hand-written `.ino` file in the repository. CMake generates the small Arduino `setup()` / `loop()` wrapper under `.build/cmake/sketch/` and then calls `arduino-cli`.
 
-The helper script reads local Arduino settings from `.vscode/settings.json`:
+The VS Code workflow is provided by JaszczurHAL's shared `jh-vscode` entrypoint.
+Stable module configuration lives in `.vscode/jaszczurhal.project.json`; local
+developer preferences live in `.vscode/settings.json`.
 
-- `arduino.cliPath`
-- `arduino.fqbn`
-- `arduino.sketchbookPath`
-- `arduino.uploadPort`
+- `jaszczurhal.cliPath`
+- `jaszczurhal.uploadPort`
 - `jaszczurhal.root`
+- `jaszczurhal.vscodeEntry`
 
-That file is intentionally local and ignored by git. For a fresh checkout, create a minimal `.vscode/settings.json` first:
+The tracked default configuration builds with `rp2040:rp2040:rpipico`; use
+`--fqbn` or update the manifest/settings locally if the physical
+RP2040-Zero-specific FQBN is needed.
 
-```json
-{
-    "arduino.cliPath": "arduino-cli",
-    "arduino.fqbn": "rp2040:rp2040:waveshare_rp2040_zero",
-    "arduino.sketchbookPath": "/path/to/arduino/sketchbook",
-    "arduino.uploadPort": "/dev/ttyACM0",
-    "jaszczurhal.root": "/path/to/libraries/JaszczurHAL"
-}
-```
-
-After that, `./scripts/select-board.sh` or the VS Code board selection tasks can update the FQBN.
+From this firmware directory, the same build can be run manually:
 
 ```bash
-./scripts/configure-cmake.sh
-cmake --build .build/cmake --target firmware
+../libraries/JaszczurHAL/vscode/entry/jh-vscode build --project .
 ```
 
 The default CMake fallback FQBN is `rp2040:rp2040:rpipico`, but `rp2040:rp2040:waveshare_rp2040_zero` also works fine. From the practical standpoint this makes no difference for this project.
@@ -49,15 +43,19 @@ The main generated artifacts are copied to `.build/firmware.elf`, `.build/firmwa
 
 ## Developer Workflow
 
-VS Code tasks and scripts use the same CMake targets:
+VS Code tasks and command-line workflow use the shared JaszczurHAL entrypoint:
 
-- `Arduino: Build` / `cmake --build .build/cmake --target firmware`
-- `Arduino: Build (Debug)` / `firmware_debug`
-- `Arduino: Upload` / `./scripts/upload-serial.sh`
-- `Arduino: Upload (UF2 / BOOTSEL)` / `./scripts/upload-uf2.sh`
-- `Arduino: Monitor (persistent)` / `scripts/serial-persistent.py`
-- `Arduino: Refresh IntelliSense` / `./scripts/refresh-intellisense.sh`
-- `Arduino: Select board` / `./scripts/select-board.sh`
+- `Project: Build`
+- `Project: Build (Debug)`
+- `Project: Upload`
+- `Project: Upload (UF2 / BOOTSEL)`
+- `Project: Serial Monitor`
+- `Project: Debug Probe Monitor`
+- `Project: Refresh IntelliSense`
+- `Project: Clear USB Identity`
+
+The old local firmware helpers under `scripts/` were removed during migration.
+The canonical path is now `../libraries/JaszczurHAL/vscode/entry/jh-vscode`.
 
 ## Board Architecture
 

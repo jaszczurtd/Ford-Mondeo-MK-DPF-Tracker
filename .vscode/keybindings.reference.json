@@ -1,7 +1,7 @@
 // =====================================================================
-// Arduino keyboard shortcuts for VS Code
+// Project keyboard shortcuts for VS Code
 //
-// Active when editing C/C++ files.
+// Global task bindings for this workspace.
 //
 // Installation:
 //   Ctrl+K Ctrl+S  -> open keyboard shortcuts editor
@@ -12,73 +12,36 @@
     {
         "key": "ctrl+shift+1",
         "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Build",
-        "when": "editorLangId == cpp || editorLangId == c"
+        "args": "Project: Build"
     },
     {
         "key": "ctrl+shift+2",
         "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Upload",
-        "when": "editorLangId == cpp || editorLangId == c"
+        "args": "Project: Upload"
     },
     {
         "key": "ctrl+shift+3",
         "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Monitor (persistent)",
-        "when": "editorLangId == cpp || editorLangId == c"
+        "args": "Project: Serial Monitor"
     },
     {
         "key": "ctrl+shift+4",
         "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Upload (UF2 / BOOTSEL)",
-        "when": "editorLangId == cpp || editorLangId == c"
+        "args": "Project: Upload (UF2 / BOOTSEL)"
     },
     {
         "key": "ctrl+shift+5",
         "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Monitor (Debug Probe)",
-        "when": "editorLangId == cpp || editorLangId == c"
+        "args": "Project: Debug Probe Monitor"
     },
     {
         "key": "ctrl+shift+6",
         "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Refresh IntelliSense",
-        "when": "editorLangId == cpp || editorLangId == c"
+        "args": "Project: Refresh IntelliSense"
     },
     {
         "key": "ctrl+shift+7",
         "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Clean",
-        "when": "editorLangId == cpp || editorLangId == c"
-    },
-    {
-        "key": "ctrl+shift+8",
-        "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: List ports",
-        "when": "editorLangId == cpp || editorLangId == c"
-    },
-    {
-        "key": "ctrl+shift+9",
-        "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Change port",
-        "when": "editorLangId == cpp || editorLangId == c"
-    },
-    {
-        "key": "ctrl+shift+0",
-        "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Install library",
-        "when": "editorLangId == cpp || editorLangId == c"
-    },
-    {
-        "key": "ctrl+shift+alt+1",
-        "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Select board (GUI)",
-        "when": "editorLangId == cpp || editorLangId == c"
-    },
-    {
-        "key": "ctrl+shift+alt+2",
-        "command": "workbench.action.tasks.runTask",
-        "args": "Arduino: Select board (interactive)",
-        "when": "editorLangId == cpp || editorLangId == c"
+        "args": "Project: Clean"
     }
 ]

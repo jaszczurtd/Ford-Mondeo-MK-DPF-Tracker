@@ -1,0 +1,41 @@
+{
+    "$schema": "../../libraries/JaszczurHAL/vscode/schema/jh_vscode_project.schema.json",
+    "project": "Ford-Mondeo-MK-DPF-Tracker",
+    "module": "Ford-Mondeo-MK-DPF-Tracker",
+    "toolchain": "cmake",
+    "fqbn": "rp2040:rp2040:rpipico",
+    "buildDir": "${project}/.build",
+    "cmakeBuildDir": "${project}/.build/cmake",
+    "cmake": {
+        "sourceDir": "${project}/../libraries/JaszczurHAL/cmake/jh_firmware_project",
+        "cache": {
+            "JH_PROJECT_DIR": "${project}",
+            "ARDUINO_LIBRARIES": "${project}/../libraries"
+        }
+    },
+    "targetProfiles": {
+        "stm32g474": {
+            "cmake": {
+                "cache": {
+                    "JH_EXTRA_LIBRARIES": "${project}/../libraries/Credentials"
+                }
+            },
+            "upload": {
+                "strategy": "openocd"
+            }
+        }
+    },
+    "identity": {
+        "enabled": true,
+        "usbManufacturer": "Jaszczur",
+        "usbProduct": "Ford Mondeo DPF Tracker",
+        "byIdHint": "Ford_Mondeo_DPF_Tracker"
+    },
+    "upload": {
+        "strategy": "serial"
+    },
+    "artifacts": {
+        "elf": "${buildDir}/firmware.elf",
+        "uf2": "${buildDir}/firmware.uf2"
+    }
+}

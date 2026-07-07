@@ -45,10 +45,18 @@
 #define SENSOR_INTERVAL_MS     500
 #define MQTT_PUBLISH_INTERVAL  2000
 #define DATA_PUBLISH_DRAIN_INTERVAL_MS 250
+/* Offline queue capacities, sized per target: full on RP2040 (264 KB SRAM),
+ * reduced on the 128 KB STM32G474RE so the offline buffers fit RAM. Both must be
+ * powers of two. HAL_TARGET_IS_* comes from <JaszczurHAL.h> (hal_target.h). */
+#if HAL_TARGET_IS_STM32G474
+#define DATA_QUEUE_CAPACITY    8
+#define EVENT_QUEUE_CAPACITY   256
+#else
 #define DATA_QUEUE_CAPACITY    64
+#define EVENT_QUEUE_CAPACITY   1024
+#endif
 #define DATA_PAYLOAD_MAX_SIZE  1536
 #define EVENT_PUBLISH_INTERVAL_MS 500
-#define EVENT_QUEUE_CAPACITY   1024
 #define EVENT_PUBLISH_BATCH_MAX 32
 #define NETWORK_TIME_INTERVAL_MS 60000
 #define GNSS_LOCATION_INTERVAL_MS 5000

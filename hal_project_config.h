@@ -10,7 +10,9 @@
  * hal_config.h - you only need to disable the base module.
  */
 
-/* CMake generates setup()/loop() wrapper and calls app_start()/app_task0(). */
+/* Application entry: the HAL provides setup()/loop() (RP2040) or main() (STM32)
+ * and calls the app's app_start()/app_task0(). Single-core (no app_task1). */
+#define HAL_PROVIDE_APP_ENTRY
 
 /* ── Modules used by Mondeo DPF Tracker ─────────────────────────────────────────── */
 

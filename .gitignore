@@ -26,8 +26,10 @@ libraries.cache
 # VS Code local/generated configuration
 .vscode/*
 !.vscode/extensions.json
+!.vscode/jaszczurhal.project.json
 !.vscode/keybindings.reference.json
 !.vscode/launch.json
+!.vscode/settings.json
 !.vscode/tasks.json
 .vscode/.browse.c_cpp.db*
 .vscode/ipch/
