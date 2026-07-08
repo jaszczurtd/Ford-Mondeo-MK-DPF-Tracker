@@ -91,3 +91,5 @@ Thumbs.db
 .codex/
 *codex*
 AGENTS.md
+# jh-vscode user-local active board selection
+.vscode/jaszczurhal.local.json

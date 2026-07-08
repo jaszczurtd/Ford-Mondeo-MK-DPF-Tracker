@@ -12,7 +12,10 @@
 
 /* Application entry: the HAL provides setup()/loop() (RP2040) or main() (STM32)
  * and calls the app's app_start()/app_task0(). Single-core (no app_task1). */
+
+#ifndef HAL_PROVIDE_APP_ENTRY
 #define HAL_PROVIDE_APP_ENTRY
+#endif
 
 /* ── Modules used by Mondeo DPF Tracker ─────────────────────────────────────────── */
 
