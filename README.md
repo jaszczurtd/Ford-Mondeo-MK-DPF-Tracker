@@ -8,13 +8,56 @@ Author: Marcin "Jaszczur" Kielesinski.
 
 This project requires [JaszczurHAL](https://github.com/jaszczurtd/JaszczurHAL).
 
-The firmware uses the shared `../libraries/Credentials` Arduino library. The
-`Credentials/` directory in this project is only a template/example and is not
-part of the active build.
+The firmware links the external, precompiled
+`../libraries/Credentials/src/cortex-m0plus/libCredentials.a` library. The
+author's local library is private and is not distributed with this repository.
+A complete public replacement is provided in `Credentials/`; it contains no
+author secrets or private encoding code. See [Credentials setup](#credentials-setup).
 
 The physical tracker uses a Waveshare RP2040-Zero module. In practice the firmware only depends on RP2040 peripherals used through Arduino/JaszczurHAL, so it also builds and runs with compatible RP2040 board definitions such as Raspberry Pi Pico. Select the FQBN that matches the board support package and upload method used on the development machine.
 
-## Build
+## Credentials setup
+
+If `../libraries/Credentials` already exists, the build uses it unchanged. This
+is how the author's private `libCredentials.a` remains active. The setup script
+will never overwrite that directory.
+
+For a fresh checkout, install a private copy of the bundled template:
+
+```bash
+./scripts/setup-credentials.sh
+```
+
+The command creates `../libraries/Credentials` and private configuration files.
+Fill in:
+
+```text
+../libraries/Credentials/config/CredentialsData.local.h
+../libraries/Credentials/config/MacHostMapping.local.cpp
+```
+
+Set `CREDENTIALS_LOCAL_CONFIGURED` to `1` after replacing every placeholder,
+then build the RP2040 archive:
+
+```bash
+../libraries/Credentials/scripts/build.sh rp2040
+```
+
+The generated archive is:
+
+```text
+../libraries/Credentials/src/cortex-m0plus/libCredentials.a
+```
+
+Both `*.local.*` configuration files and generated archives are ignored by
+Git. Do not commit them. The template implements the public API without any
+encoding; users provide and own their credentials. Detailed instructions are
+in [Credentials/README.md](Credentials/README.md).
+
+For STM32G474, use `build.sh stm32g474`; the manifest links the resulting
+`build/stm32g474/libCredentials.a`.
+
+## Firmware build
 
 The application uses portable app functions (`app_start()` / `app_task0()`), so there is no hand-written `.ino` file in the repository. CMake generates the small Arduino `setup()` / `loop()` wrapper under `.build/cmake/sketch/` and then calls `arduino-cli`.
 

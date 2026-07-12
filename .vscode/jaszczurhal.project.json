@@ -17,7 +17,8 @@
         "stm32g474": {
             "cmake": {
                 "cache": {
-                    "JH_EXTRA_LIBRARIES": "${project}/../libraries/Credentials"
+                    "JH_EXTRA_INCLUDES": "${project}/../libraries/Credentials/src",
+                    "JH_LINK_LIBRARIES": "${project}/../libraries/Credentials/build/stm32g474/libCredentials.a"
                 }
             },
             "upload": {

@@ -38,6 +38,19 @@ hal_thermocouple_t egt_mid_dpf = NULL;
 
 static SensorData sensors;
 
+static void clearAndFreeSecret(char *secret) {
+  if (secret == nullptr) {
+    return;
+  }
+
+  volatile char *bytes = secret;
+  const size_t length = strlen(secret);
+  for (size_t i = 0; i < length; ++i) {
+    bytes[i] = '\0';
+  }
+  free(secret);
+}
+
 static bool modem_ready = false;
 static bool mqtt_connected = false;
 static bool watchdog_reboot_status_pending = false;
@@ -673,10 +686,6 @@ bool modemInit() {
       return false;
     }
 
-    static const char* secrets[] = { MQTT_USER, MQTT_PASSWORD };
-    hal_modem_at_set_log_filter(hal_simcom_a76xx_get_at(modem),
-                                secrets,
-                                sizeof(secrets) / sizeof(secrets[0]));
     hal_modem_at_set_tick_callback(hal_simcom_a76xx_get_at(modem),
                                    modemTick, nullptr);
     hal_simcom_a76xx_mqtt_set_message_callback(modem, onMqttMessage, nullptr);
@@ -728,6 +737,9 @@ bool modemInit() {
 
 bool mqttConnect() {
   char* watchdog_status_payload = nullptr;
+  char* broker_host = nullptr;
+  char* mqtt_user = nullptr;
+  char* mqtt_password = nullptr;
 
   if (modem == nullptr) {
     setCriticalError(ERR_MQTT_CONNECT, "modem not initialised");
@@ -737,12 +749,24 @@ bool mqttConnect() {
   ledSetStatus(LED_CONNECTING);
   last_critical_error = ERR_NONE;
 
+  broker_host = getCredential(CR_MQTT_BROKER_IP);
+  mqtt_user = getCredential(CR_MQTT_USER);
+  mqtt_password = getCredential(CR_MQTT_PASSWORD);
+  if (broker_host == nullptr || mqtt_user == nullptr || mqtt_password == nullptr) {
+    clearAndFreeSecret(broker_host);
+    clearAndFreeSecret(mqtt_user);
+    clearAndFreeSecret(mqtt_password);
+    setCriticalError(ERR_MQTT_CONNECT, "MQTT credentials decode failed");
+    ledSetStatus(LED_ERROR);
+    return false;
+  }
+
   hal_simcom_a76xx_mqtt_config_t mq = {};
-  mq.broker_host  = MQTT_BROKER_IP;
-  mq.broker_port  = MQTT_BROKER_SECURE_PORT;
+  mq.broker_host  = broker_host;
+  mq.broker_port  = getCredentialInt(CR_MQTT_BROKER_SECURE_PORT);
   mq.client_id    = MQTT_CLIENT_ID;
-  mq.username     = MQTT_USER;
-  mq.password     = MQTT_PASSWORD;
+  mq.username     = mqtt_user;
+  mq.password     = mqtt_password;
   mq.keepalive_s  = MQTT_KEEPALIVE;
   mq.clean_session = true;
   mq.client_index = MQTT_CLIENT_INDEX;
@@ -754,7 +778,19 @@ bool mqttConnect() {
   mq.ssl.sslversion         = 4;   // TLS 1.2
   mq.ssl.authmode           = 1;   // verify server cert only
 
-  if (hal_simcom_a76xx_mqtt_connect(modem, &mq) != HAL_SIMCOM_A76XX_OK) {
+  const char* secrets[] = { mqtt_user, mqtt_password };
+  hal_modem_at_t modem_at = hal_simcom_a76xx_get_at(modem);
+  hal_modem_at_set_log_filter(modem_at, secrets,
+                              sizeof(secrets) / sizeof(secrets[0]));
+  const hal_simcom_a76xx_result_t connect_result =
+      hal_simcom_a76xx_mqtt_connect(modem, &mq);
+  hal_modem_at_set_log_filter(modem_at, nullptr, 0);
+
+  clearAndFreeSecret(broker_host);
+  clearAndFreeSecret(mqtt_user);
+  clearAndFreeSecret(mqtt_password);
+
+  if (connect_result != HAL_SIMCOM_A76XX_OK) {
     setCriticalError(ERR_MQTT_CONNECT, "MQTT connect failed");
     ledSetStatus(LED_ERROR);
     return false;
