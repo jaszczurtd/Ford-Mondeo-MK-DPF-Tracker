@@ -345,16 +345,20 @@ void ledSetStatus(LedStatus s) {
   led_on = false;
 }
 
-void ledUpdate() {
-  uint32_t now = hal_millis();
+static void ledBlinkInterval(void* user_data) {
+  (void)user_data;
 
+  led_on = !led_on;
+  const hal_rgb_led_color_t color =
+      (led_status == LED_ERROR) ? HAL_RGB_LED_RED : HAL_RGB_LED_GREEN;
+  hal_rgb_led_set_color(led_on ? color : HAL_RGB_LED_NONE);
+}
+
+void ledUpdate() {
   switch (led_status) {
     case LED_CONNECTING:
-      if (now - led_last_ms >= 250) {
-        led_last_ms = now;
-        led_on = !led_on;
-        hal_rgb_led_set_color(led_on ? HAL_RGB_LED_GREEN : HAL_RGB_LED_NONE);
-      }
+      hal_millis_interval_call_now(&led_last_ms, 250, ledBlinkInterval,
+                                   nullptr);
       break;
 
     case LED_OK:
@@ -362,11 +366,8 @@ void ledUpdate() {
       break;
 
     case LED_ERROR:
-      if (now - led_last_ms >= 300) {
-        led_last_ms = now;
-        led_on = !led_on;
-        hal_rgb_led_set_color(led_on ? HAL_RGB_LED_RED : HAL_RGB_LED_NONE);
-      }
+      hal_millis_interval_call_now(&led_last_ms, 300, ledBlinkInterval,
+                                   nullptr);
       break;
 
     case LED_SENDING:
@@ -1186,11 +1187,7 @@ void app_start(void) {
 // =============================================================
 
 void app_task0(void) {
-  uint32_t now = hal_millis();
-  char* payload = nullptr;
-  char* event_payload = nullptr;
-  const char* data_payload_to_publish = nullptr;
-  size_t event_count = 0;
+  const uint32_t now = hal_millis();
 
   hal_watchdog_feed();
   ledUpdate();
@@ -1216,40 +1213,43 @@ void app_task0(void) {
     return;
   }
 
-  if (now - last_sensor_ms >= SENSOR_INTERVAL_MS) {
-    last_sensor_ms = now;
+  if (hal_millis_interval_elapsed(now, &last_sensor_ms, SENSOR_INTERVAL_MS)) {
     sensorsRead();
   }
 
-  if (modem_ready && (now - last_gnss_location_ms >= GNSS_LOCATION_INTERVAL_MS)) {
-    last_gnss_location_ms = now;
-    hal_simcom_a76xx_result_t gr = updateGnssLocation();
-    if (gr != HAL_SIMCOM_A76XX_OK) {
-      gnss_location_last_error = gr;
+  if (modem_ready &&
+      hal_millis_interval_elapsed(now, &last_gnss_location_ms,
+                                  GNSS_LOCATION_INTERVAL_MS)) {
+    hal_simcom_a76xx_result_t result = updateGnssLocation();
+    if (result != HAL_SIMCOM_A76XX_OK) {
+      gnss_location_last_error = result;
       if (!gnss_location_valid) {
-        deb("[GNSS] fix unavailable (err=%d)", (int)gr);
+        deb("[GNSS] fix unavailable (err=%d)", (int)result);
       } else {
-        deb("[GNSS] update failed (err=%d), keeping last fix", (int)gr);
+        deb("[GNSS] update failed (err=%d), keeping last fix", (int)result);
       }
     }
   }
 
-  if (modem_ready && (now - last_cell_location_ms >= CELL_LOCATION_INTERVAL_MS)) {
-    last_cell_location_ms = now;
-    hal_simcom_a76xx_result_t lr = updateCellLocation();
-    if (lr != HAL_SIMCOM_A76XX_OK) {
-      cell_location_last_error = lr;
+  if (modem_ready &&
+      hal_millis_interval_elapsed(now, &last_cell_location_ms,
+                                  CELL_LOCATION_INTERVAL_MS)) {
+    hal_simcom_a76xx_result_t result = updateCellLocation();
+    if (result != HAL_SIMCOM_A76XX_OK) {
+      cell_location_last_error = result;
       if (!cell_location_valid) {
-        deb("[CELL] location unavailable (err=%d)", (int)lr);
+        deb("[CELL] location unavailable (err=%d)", (int)result);
       } else {
-        deb("[CELL] update failed (err=%d), keeping last fix", (int)lr);
+        deb("[CELL] update failed (err=%d), keeping last fix", (int)result);
       }
     }
   }
 
-  if (mqtt_connected && (now - last_event_publish_ms >= EVENT_PUBLISH_INTERVAL_MS)) {
-    last_event_publish_ms = now;
-    event_payload = buildEventPayload(&event_count);
+  if (mqtt_connected &&
+      hal_millis_interval_elapsed(now, &last_event_publish_ms,
+                                  EVENT_PUBLISH_INTERVAL_MS)) {
+    size_t event_count = 0;
+    char* event_payload = buildEventPayload(&event_count);
     if (event_payload != nullptr) {
       deb("[EVT] %s", event_payload);
       if (mqttPublish(MQTT_TOPIC_EVENTS, event_payload)) {
@@ -1264,21 +1264,20 @@ void app_task0(void) {
     }
   }
 
-  if (now - last_publish_ms >= MQTT_PUBLISH_INTERVAL) {
-    last_publish_ms = now;
+  if (hal_millis_interval_elapsed(now, &last_publish_ms,
+                                  MQTT_PUBLISH_INTERVAL)) {
     if (mqtt_connected &&
         ((network_time[0] == '\0') ||
          (now - last_network_time_ms >= NETWORK_TIME_INTERVAL_MS))) {
       updateNetworkTime();
     }
 
-    payload = buildPayload();
+    char* payload = buildPayload();
     if (payload != nullptr) {
       if (!dataQueuePush(payload)) {
         derr("[DATA] queue full, payload dropped");
       }
       hal_watchdog_feed();
-
       free(payload);
     } else {
       derr("memory allocation problem!");
@@ -1288,21 +1287,21 @@ void app_task0(void) {
   }
 
   if (mqtt_connected &&
-      (now - last_data_publish_drain_ms >= DATA_PUBLISH_DRAIN_INTERVAL_MS)) {
-    last_data_publish_drain_ms = now;
-    data_payload_to_publish = dataQueuePeek();
-    if (data_payload_to_publish != nullptr) {
-      deb("[PUB] %s", data_payload_to_publish);
-
-      if (mqttPublish(MQTT_TOPIC_DATA, data_payload_to_publish)) {
+      hal_millis_interval_elapsed(now, &last_data_publish_drain_ms,
+                                  DATA_PUBLISH_DRAIN_INTERVAL_MS)) {
+    const char* payload = dataQueuePeek();
+    if (payload != nullptr) {
+      deb("[PUB] %s", payload);
+      if (mqttPublish(MQTT_TOPIC_DATA, payload)) {
         dataQueueCommit();
       }
       hal_watchdog_feed();
     }
   }
 
-  if (!mqtt_connected && (now - last_reconnect_ms >= RECONNECT_INTERVAL_MS)) {
-    last_reconnect_ms = now;
+  if (!mqtt_connected &&
+      hal_millis_interval_elapsed(now, &last_reconnect_ms,
+                                  RECONNECT_INTERVAL_MS)) {
     reconnect_fails++;
     ledSetStatus(LED_CONNECTING);
 
