@@ -860,11 +860,12 @@ bool mqttPublish(const char* topic, const char* payload) {
 void sensorsInit() {
   hal_adc_set_resolution(12);
 
-  hal_thermocouple_config_t egt_cfg;
+  hal_thermocouple_config_t egt_cfg = {};
   egt_cfg.chip             = HAL_THERMOCOUPLE_CHIP_MCP9600;
   egt_cfg.bus.i2c.sda_pin  = PIN_I2C_SDA;
   egt_cfg.bus.i2c.scl_pin  = PIN_I2C_SCL;
   egt_cfg.bus.i2c.clock_hz = HAL_I2C_CLOCK_STANDARD_HZ;
+  egt_cfg.bus.i2c.i2c_bus  = 0;
   egt_cfg.bus.i2c.i2c_addr = MCP9600_ADDR_PRE_DPF;
   egt_pre_dpf = hal_thermocouple_init(&egt_cfg);
   if (!egt_pre_dpf) {

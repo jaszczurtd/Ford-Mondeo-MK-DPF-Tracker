@@ -14,7 +14,11 @@ author's local library is private and is not distributed with this repository.
 A complete public replacement is provided in `Credentials/`; it contains no
 author secrets or private encoding code. See [Credentials setup](#credentials-setup).
 
-The physical tracker uses a Waveshare RP2040-Zero module. In practice the firmware only depends on RP2040 peripherals used through Arduino/JaszczurHAL, so it also builds and runs with compatible RP2040 board definitions such as Raspberry Pi Pico. Select the FQBN that matches the board support package and upload method used on the development machine.
+The physical tracker uses a Waveshare RP2040-Zero module. The tracked manifest
+selects JaszczurHAL target `rp2040` and board profile `rp2040-zero`, which build
+the firmware directly with the official Pico SDK. Other compatible RP board
+profiles can be selected for development when their pinout and board devices
+match the connected hardware.
 
 ## Credentials setup
 
@@ -59,20 +63,22 @@ For STM32G474, use `build.sh stm32g474`; the manifest links the resulting
 
 ## Firmware build
 
-The application uses portable app functions (`app_start()` / `app_task0()`), so there is no hand-written `.ino` file in the repository. CMake generates the small Arduino `setup()` / `loop()` wrapper under `.build/cmake/sketch/` and then calls `arduino-cli`.
+The application uses JaszczurHAL's portable `app_start()` and `app_task0()`
+entry points. The shared native dispatcher configures CMake for the selected
+target and board profile, then builds RP firmware with the official Pico SDK.
 
 The VS Code workflow is provided by JaszczurHAL's shared `jh-vscode` entrypoint.
 Stable module configuration lives in `.vscode/jaszczurhal.project.json`; local
 developer preferences live in `.vscode/settings.json`.
 
-- `jaszczurhal.cliPath`
 - `jaszczurhal.uploadPort`
 - `jaszczurhal.root`
 - `jaszczurhal.vscodeEntry`
 
-The tracked default configuration builds with `rp2040:rp2040:rpipico`; use
-`--fqbn` or update the manifest/settings locally if the physical
-RP2040-Zero-specific FQBN is needed.
+The tracked default configuration uses target `rp2040` and board
+`rp2040-zero`. Use `Project: Select board`, or pass `--target` and `--board` to
+`jh-vscode`, to create a local target selection without changing the tracked
+manifest.
 
 From this firmware directory, the same build can be run manually:
 
@@ -80,9 +86,14 @@ From this firmware directory, the same build can be run manually:
 ../libraries/JaszczurHAL/vscode/entry/jh-vscode build --project .
 ```
 
-The default CMake fallback FQBN is `rp2040:rp2040:rpipico`, but `rp2040:rp2040:waveshare_rp2040_zero` also works fine. From the practical standpoint this makes no difference for this project.
+The selected board profile controls the Pico SDK board definition, flash size,
+GPIO capabilities, and upload defaults. Keep `rp2040-zero` for the physical
+tracker so its WS2812 status LED on GPIO16 is described correctly.
 
-The main generated artifacts are copied to `.build/firmware.elf`, `.build/firmware.bin`, `.build/firmware.uf2`, and `.build/firmware.map`.
+The main generated artifacts are copied to `.build/firmware.elf`,
+`.build/firmware.bin`, and `.build/firmware.uf2`. Detailed linker output,
+including `firmware.elf.map`, remains in the resolved target/board directory
+below `.build/cmake/`.
 
 ## Developer Workflow
 
@@ -98,7 +109,8 @@ VS Code tasks and command-line workflow use the shared JaszczurHAL entrypoint:
 - `Project: Clear USB Identity`
 
 The old local firmware helpers under `scripts/` were removed during migration.
-The canonical path is now `../libraries/JaszczurHAL/vscode/entry/jh-vscode`.
+The supported entrypoint is
+`../libraries/JaszczurHAL/vscode/entry/jh-vscode`.
 
 ## Board Architecture
 

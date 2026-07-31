@@ -3,14 +3,17 @@
     "project": "Ford-Mondeo-MK-DPF-Tracker",
     "module": "Ford-Mondeo-MK-DPF-Tracker",
     "toolchain": "cmake",
-    "fqbn": "rp2040:rp2040:rpipico",
+    "target": "rp2040",
+    "board": "rp2040-zero",
     "buildDir": "${project}/.build",
     "cmakeBuildDir": "${project}/.build/cmake",
     "cmake": {
         "sourceDir": "${project}/../libraries/JaszczurHAL/cmake/jh_firmware_project",
         "cache": {
             "JH_PROJECT_DIR": "${project}",
-            "ARDUINO_LIBRARIES": "${project}/../libraries"
+            "JH_MODULE_NAME": "Ford-Mondeo-MK-DPF-Tracker",
+            "JH_EXTRA_INCLUDES": "${project}/../libraries/Credentials/src",
+            "JH_LINK_LIBRARIES": "${project}/../libraries/Credentials/src/cortex-m0plus/libCredentials.a"
         }
     },
     "targetProfiles": {
