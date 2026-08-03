@@ -1,5 +1,4 @@
 {
-    "jaszczurhal.uploadPort": "",
     "jaszczurhal.buildDir": "${workspaceFolder}/.build",
     "jaszczurhal.verbose": true,
     "jaszczurhal.root": "../libraries/JaszczurHAL",
@@ -16,5 +15,6 @@
         "**/.build": true
     },
     "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 500
+    "files.autoSaveDelay": 500,
+    "jaszczurhal.vscodeEntryWindows": "../libraries/JaszczurHAL/vscode/entry/jh-vscode.cmd"
 }

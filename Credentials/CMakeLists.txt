@@ -10,7 +10,7 @@ if(NOT CREDENTIALS_TARGET MATCHES "^(rp2040|stm32g474)$")
 endif()
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config/CredentialsData.local.h" OR
    NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config/MacHostMapping.local.cpp")
-    message(FATAL_ERROR "Run ./scripts/configure.sh and fill the generated config/*.local.* files")
+    message(FATAL_ERROR "Run scripts/configure.py and fill the generated config/*.local.* files")
 endif()
 
 add_library(Credentials STATIC

@@ -28,6 +28,10 @@ will never overwrite that directory.
 
 For a fresh checkout, install a private copy of the bundled template:
 
+```powershell
+py -3 scripts/setup_credentials.py
+```
+
 ```bash
 ./scripts/setup-credentials.sh
 ```
@@ -42,6 +46,10 @@ Fill in:
 
 Set `CREDENTIALS_LOCAL_CONFIGURED` to `1` after replacing every placeholder,
 then build the RP2040 archive:
+
+```powershell
+py -3 ../libraries/Credentials/scripts/build.py rp2040
+```
 
 ```bash
 ../libraries/Credentials/scripts/build.sh rp2040
@@ -61,6 +69,11 @@ in [Credentials/README.md](Credentials/README.md).
 For STM32G474, use `build.sh stm32g474`; the manifest links the resulting
 `build/stm32g474/libCredentials.a`.
 
+The setup command refuses an existing destination before copying anything, so
+the author's private library is never replaced. Automated builds use a fresh
+destination and `py -3 scripts/setup_credentials.py --test-config`; its values
+are public documentation fixtures and are not suitable for a real device.
+
 ## Firmware build
 
 The application uses JaszczurHAL's portable `app_start()` and `app_task0()`
@@ -74,6 +87,9 @@ developer preferences live in `.vscode/settings.json`.
 - `jaszczurhal.uploadPort`
 - `jaszczurhal.root`
 - `jaszczurhal.vscodeEntry`
+
+On Windows the generated tasks use `jaszczurhal.vscodeEntryWindows` and keep
+the COM port exclusively in the ignored `.vscode/jaszczurhal.local.json`.
 
 The tracked default configuration uses target `rp2040` and board
 `rp2040-zero`. Use `Project: Select board`, or pass `--target` and `--board` to
@@ -95,6 +111,12 @@ The main generated artifacts are copied to `.build/firmware.elf`,
 including `firmware.elf.map`, remains in the resolved target/board directory
 below `.build/cmake/`.
 
+The `Windows firmware` workflow repeats the non-secret Credentials setup,
+RP2040 and STM32G474 archive builds, both complete firmware builds and
+IntelliSense generation on a native `windows-2025` runner. Hardware upload is
+kept as a manual identity-guarded smoke test and is not attempted by a hosted
+runner.
+
 ## Developer Workflow
 
 VS Code tasks and command-line workflow use the shared JaszczurHAL entrypoint:
@@ -111,6 +133,14 @@ VS Code tasks and command-line workflow use the shared JaszczurHAL entrypoint:
 The old local firmware helpers under `scripts/` were removed during migration.
 The supported entrypoint is
 `../libraries/JaszczurHAL/vscode/entry/jh-vscode`.
+
+After changing the shared JaszczurHAL task registry, regenerate and verify the
+tracked VS Code files with:
+
+```powershell
+py -3 scripts/sync_vscode_project.py
+py -3 scripts/sync_vscode_project.py --check
+```
 
 ## Board Architecture
 

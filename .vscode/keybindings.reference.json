@@ -1,13 +1,3 @@
-// =====================================================================
-// Project keyboard shortcuts for VS Code
-//
-// Global task bindings for this workspace.
-//
-// Installation:
-//   Ctrl+K Ctrl+S  -> open keyboard shortcuts editor
-//   Click the {} icon (top-right) -> open keybindings.json
-//   Paste entries below into the [] array.
-// =====================================================================
 [
     {
         "key": "ctrl+shift+1",
@@ -45,6 +35,16 @@
         "args": "Project: Clean"
     },
     {
+        "key": "ctrl+shift+8",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Project: Upload (OTA)"
+    },
+    {
+        "key": "ctrl+shift+9",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Project: Config Dump"
+    },
+    {
         "key": "ctrl+shift+alt+1",
         "command": "workbench.action.tasks.runTask",
         "args": "Project: Select board (GUI)"
@@ -53,5 +53,10 @@
         "key": "ctrl+shift+alt+2",
         "command": "workbench.action.tasks.runTask",
         "args": "Project: Select board"
+    },
+    {
+        "key": "ctrl+shift+alt+3",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Project: Discover OTA devices"
     }
 ]

@@ -1,19 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SOURCE_DIR="${PROJECT_DIR}/Credentials"
-DESTINATION=${1:-"${PROJECT_DIR}/../libraries/Credentials"}
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-if [[ -e "${DESTINATION}" ]]; then
-    echo "error: refusing to overwrite existing Credentials: ${DESTINATION}" >&2
-    echo "The current private library remains untouched." >&2
-    exit 2
+if [[ $# -gt 0 && "${1}" != --* ]]; then
+    destination=$1
+    shift
+    exec python3 "${SCRIPT_DIR}/setup_credentials.py" \
+        --destination "${destination}" "$@"
 fi
 
-mkdir -p "$(dirname "${DESTINATION}")"
-cp -a "${SOURCE_DIR}" "${DESTINATION}"
-"${DESTINATION}/scripts/configure.sh"
-
-echo "Installed Credentials template at ${DESTINATION}"
-echo "See ${DESTINATION}/README.md before building it."
+exec python3 "${SCRIPT_DIR}/setup_credentials.py" "$@"

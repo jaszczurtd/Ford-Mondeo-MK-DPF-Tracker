@@ -33,6 +33,8 @@
         "enabled": true,
         "usbManufacturer": "Jaszczur",
         "usbProduct": "Ford Mondeo DPF Tracker",
+        "usbVid": "0x2e8a",
+        "usbPid": "0x000a",
         "byIdHint": "Ford_Mondeo_DPF_Tracker"
     },
     "upload": {

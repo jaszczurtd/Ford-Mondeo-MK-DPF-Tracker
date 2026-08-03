@@ -1,0 +1,108 @@
+name: Windows firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PYTHONUTF8: "1"
+
+jobs:
+  windows-firmware:
+    runs-on: windows-2025
+
+    steps:
+      - name: Check out Ford Tracker
+        uses: actions/checkout@v5
+        with:
+          path: workspace/Ford-Mondeo-MK-DPF-Tracker
+
+      - name: Check out JaszczurHAL
+        uses: actions/checkout@v5
+        with:
+          repository: jaszczurtd/JaszczurHAL
+          path: workspace/libraries/JaszczurHAL
+
+      - name: Cache authenticated Windows tools
+        uses: actions/cache@v4
+        with:
+          path: C:\jh\tools
+          key: ford-windows-tools-${{ hashFiles('workspace/libraries/JaszczurHAL/third_party/windows_tools_version.conf', 'workspace/libraries/JaszczurHAL/third_party/riscv_toolchain_version.conf', 'workspace/libraries/JaszczurHAL/third_party/windows_requirements.txt') }}
+
+      - name: Prepare native Windows environment
+        shell: powershell
+        working-directory: workspace/libraries/JaszczurHAL
+        run: >-
+          .\runmefirst.ps1 -Force -ConfigureHost -FirmwareOnly
+          -ToolsRoot C:\jh\tools
+          -BuildRoot C:\jh\build
+
+      - name: Validate project generators and Credentials safety
+        shell: powershell
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          $python = '..\libraries\JaszczurHAL\.build\windows\venv\Scripts\python.exe'
+          & $python tests/test_credentials_tooling.py
+          if ($LASTEXITCODE -ne 0) { throw 'Credentials tooling tests failed.' }
+          & $python tests/test_vscode_project.py
+          if ($LASTEXITCODE -ne 0) { throw 'VS Code project tests failed.' }
+
+      - name: Install and build non-secret Credentials fixture
+        shell: powershell
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          $jh = Resolve-Path '..\libraries\JaszczurHAL'
+          $python = Join-Path $jh '.build\windows\venv\Scripts\python.exe'
+          $state = Join-Path $jh '.build\windows\host-environment.json'
+          & $python scripts/setup_credentials.py --test-config
+          if ($LASTEXITCODE -ne 0) { throw 'Credentials fixture setup failed.' }
+          $builder = '..\libraries\Credentials\scripts\build.py'
+          & $python $builder rp2040 --host-environment $state
+          if ($LASTEXITCODE -ne 0) { throw 'RP2040 Credentials build failed.' }
+          & $python $builder stm32g474 --host-environment $state
+          if ($LASTEXITCODE -ne 0) { throw 'STM32G474 Credentials build failed.' }
+
+      - name: Build RP2040 Tracker and IntelliSense database
+        shell: powershell
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          $entry = '..\libraries\JaszczurHAL\vscode\entry\jh-vscode.cmd'
+          & $entry build --project . --target rp2040 --board rp2040-zero
+          if ($LASTEXITCODE -ne 0) { throw 'RP2040 Tracker build failed.' }
+          & $entry refresh-intellisense --project . --target rp2040 --board rp2040-zero
+          if ($LASTEXITCODE -ne 0) { throw 'RP2040 IntelliSense refresh failed.' }
+          New-Item -ItemType Directory -Path '.build\ci-artifacts' -Force | Out-Null
+          Copy-Item '.build\firmware.uf2' '.build\ci-artifacts\tracker-rp2040-zero.uf2'
+
+      - name: Build STM32G474 Tracker and IntelliSense database
+        shell: powershell
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          $entry = '..\libraries\JaszczurHAL\vscode\entry\jh-vscode.cmd'
+          & $entry build --project . --target stm32g474 --board nucleo-g474re
+          if ($LASTEXITCODE -ne 0) { throw 'STM32G474 Tracker build failed.' }
+          & $entry refresh-intellisense --project . --target stm32g474 --board nucleo-g474re
+          if ($LASTEXITCODE -ne 0) { throw 'STM32G474 IntelliSense refresh failed.' }
+          Copy-Item '.build\firmware.elf' '.build\ci-artifacts\tracker-stm32g474.elf'
+
+      - name: Verify checkout stayed free of local credentials and archives
+        shell: powershell
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Build modified tracked files.' }
+          $unexpected = git status --porcelain --untracked-files=all
+          if ($unexpected) {
+            throw "Build left unexpected repository files:`n$unexpected"
+          }
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ford-tracker-windows-firmware
+          path: workspace/Ford-Mondeo-MK-DPF-Tracker/.build/ci-artifacts/*
+          if-no-files-found: error
