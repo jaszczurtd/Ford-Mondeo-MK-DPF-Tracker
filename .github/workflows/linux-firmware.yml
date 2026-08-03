@@ -1,0 +1,102 @@
+name: Linux firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  linux-firmware:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Ford Tracker
+        uses: actions/checkout@v5
+        with:
+          path: workspace/Ford-Mondeo-MK-DPF-Tracker
+
+      - name: Check out JaszczurHAL
+        uses: actions/checkout@v5
+        with:
+          repository: jaszczurtd/JaszczurHAL
+          path: workspace/libraries/JaszczurHAL
+
+      - name: Install native RP and STM32 build prerequisites
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build \
+            gcc-arm-none-eabi binutils-arm-none-eabi \
+            libstdc++-arm-none-eabi-newlib \
+            libusb-1.0-0-dev pkg-config python3
+          test -f "$(arm-none-eabi-g++ -print-file-name=libstdc++.a)"
+
+      - name: Provision pinned JaszczurHAL components
+        working-directory: workspace/libraries/JaszczurHAL
+        run: |
+          set -eux
+          python3 scripts/component_manager.py source-components
+          python3 scripts/component_manager.py component picotool --enable
+
+      - name: Install and build non-secret Credentials fixture
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          set -eux
+          python3 scripts/setup_credentials.py --test-config
+          python3 ../libraries/Credentials/scripts/build.py rp2040
+          python3 ../libraries/Credentials/scripts/build.py stm32g474
+          test -f ../libraries/Credentials/src/cortex-m0plus/libCredentials.a
+          test -f ../libraries/Credentials/build/stm32g474/libCredentials.a
+
+      - name: Build RP2040 Tracker firmware
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          set -eux
+          ../libraries/JaszczurHAL/vscode/entry/jh-vscode build \
+            --project "$PWD" --target rp2040 --board rp2040-zero
+          mkdir -p .build/ci-artifacts
+          cp .build/firmware.elf .build/ci-artifacts/tracker-rp2040-zero.elf
+          cp .build/firmware.uf2 .build/ci-artifacts/tracker-rp2040-zero.uf2
+
+      - name: Build RP2040 debug firmware and IntelliSense database
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          set -eux
+          ../libraries/JaszczurHAL/vscode/entry/jh-vscode build-debug \
+            --project "$PWD" --target rp2040 --board rp2040-zero
+          ../libraries/JaszczurHAL/vscode/entry/jh-vscode refresh-intellisense \
+            --project "$PWD" --target rp2040 --board rp2040-zero
+
+      - name: Build STM32G474 Tracker firmware
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          set -eux
+          ../libraries/JaszczurHAL/vscode/entry/jh-vscode build \
+            --project "$PWD" --target stm32g474 --board nucleo-g474re
+          cp .build/firmware.elf .build/ci-artifacts/tracker-stm32g474.elf
+
+      - name: Verify checkout stayed free of local credentials and archives
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: |
+          set -eu
+          git diff --exit-code
+          unexpected="$(git status --porcelain --untracked-files=all)"
+          if [ -n "${unexpected}" ]; then
+            printf 'Build left unexpected repository files:\n%s\n' "${unexpected}" >&2
+            exit 1
+          fi
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ford-tracker-linux-firmware
+          path: workspace/Ford-Mondeo-MK-DPF-Tracker/.build/ci-artifacts/*
+          if-no-files-found: error
