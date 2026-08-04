@@ -11,6 +11,11 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+MANAGED_DEBUG_PROFILES = {
+    "Project: Debug Firmware",
+    "Project: Debug Firmware (RP2350 ARM)",
+    "Project: Debug Firmware (STM32G474 / ST-Link)",
+}
 
 
 class VscodeProjectTests(unittest.TestCase):
@@ -63,6 +68,15 @@ class VscodeProjectTests(unittest.TestCase):
 
         launch = (REPO_ROOT / ".vscode" / "launch.json").read_text(encoding="utf-8")
         self.assertNotIn("${config:cortex-debug.", launch)
+        profiles = {
+            profile["name"]: profile
+            for profile in json.loads(launch)["configurations"]
+        }
+        self.assertEqual(set(profiles), MANAGED_DEBUG_PROFILES)
+        self.assertEqual(
+            profiles["Project: Debug Firmware (STM32G474 / ST-Link)"]["configFiles"],
+            ["board/st_nucleo_g4.cfg"],
+        )
 
 
 if __name__ == "__main__":

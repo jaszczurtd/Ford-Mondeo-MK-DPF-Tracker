@@ -9,10 +9,7 @@ Author: Marcin "Jaszczur" Kielesinski.
 This project requires [JaszczurHAL](https://github.com/jaszczurtd/JaszczurHAL).
 
 The firmware links the external, precompiled
-`../libraries/Credentials/src/cortex-m0plus/libCredentials.a` library. The
-author's local library is private and is not distributed with this repository.
-A complete public replacement is provided in `Credentials/`; it contains no
-author secrets or private encoding code. See [Credentials setup](#credentials-setup).
+`../libraries/Credentials/src/cortex-m0plus/libCredentials.a` library. A complete public replacement is provided in `Credentials/`; it contains no any secrets or private encoding code (you have to use your own secrets and compile your own libCredentials.a). See [Credentials setup](#credentials-setup).
 
 The physical tracker uses a Waveshare RP2040-Zero module. The tracked manifest
 selects JaszczurHAL target `rp2040` and board profile `rp2040-zero`, which build
