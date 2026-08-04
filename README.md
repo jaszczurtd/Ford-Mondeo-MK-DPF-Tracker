@@ -130,6 +130,11 @@ VS Code tasks and command-line workflow use the shared JaszczurHAL entrypoint:
 - `Project: Refresh IntelliSense`
 - `Project: Clear USB Identity`
 
+The Run and Debug view provides RP2040/RP2350 launch and attach profiles for a
+CMSIS-DAP Debug Probe. On native Windows, JaszczurHAL `runmefirst.ps1`
+configures the verified OpenOCD and GNU Arm paths in the user profile; the
+project launch file does not require machine-local Cortex-Debug variables.
+
 The old local firmware helpers under `scripts/` were removed during migration.
 The supported entrypoint is
 `../libraries/JaszczurHAL/vscode/entry/jh-vscode`.
