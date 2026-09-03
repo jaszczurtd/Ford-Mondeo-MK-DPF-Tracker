@@ -2,7 +2,6 @@
 
 #include <JaszczurHAL.h>
 #include <hal/core/hal_app.h>
-#include <tools.h>
 #include <Credentials.h>
 
 

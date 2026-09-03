@@ -1,5 +1,7 @@
 #include "../MacHostMapping.h"
 
+#include <hal/core/hal_array.h>
+
 // Copy this file to MacHostMapping.local.cpp and enter the MAC address of your
 // board. The private key is returned as a newly allocated string and is erased
 // and freed by the Tracker after WireGuard initialization.
@@ -13,4 +15,4 @@ const MacEntry mac_table[] = {
     }
 };
 
-const size_t mac_table_size = sizeof(mac_table) / sizeof(mac_table[0]);
+const size_t mac_table_size = COUNTOF(mac_table);

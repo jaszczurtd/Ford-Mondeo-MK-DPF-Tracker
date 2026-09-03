@@ -1,5 +1,7 @@
 #include "../MacHostMapping.h"
 
+#include <hal/core/hal_array.h>
+
 // Locally administered MAC plus RFC 5737 documentation address. These values
 // are non-secret and reserved for tests.
 const MacEntry mac_table[] = {
@@ -12,4 +14,4 @@ const MacEntry mac_table[] = {
     }
 };
 
-const size_t mac_table_size = sizeof(mac_table) / sizeof(mac_table[0]);
+const size_t mac_table_size = COUNTOF(mac_table);

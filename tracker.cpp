@@ -25,6 +25,8 @@
 
 #include "tracker.h"
 
+#include <cJSON.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -125,7 +127,8 @@ static uint32_t data_queue_overflow_count = 0;
 
 static cJSON* addFixed2Number(cJSON* root, const char* key, float value) {
   char num_buf[24] = {0};
-  (void)snprintf(num_buf, sizeof(num_buf), "%.2f", (double)roundToN(value, 2));
+  (void)snprintf(num_buf, sizeof(num_buf), "%.2f",
+                 (double)hal_math_round_precision(value, 2));
   return cJSON_AddRawToObject(root, key, num_buf);
 }
 
@@ -781,8 +784,7 @@ bool mqttConnect() {
 
   const char* secrets[] = { mqtt_user, mqtt_password };
   hal_modem_at_t modem_at = hal_simcom_a76xx_get_at(modem);
-  hal_modem_at_set_log_filter(modem_at, secrets,
-                              sizeof(secrets) / sizeof(secrets[0]));
+  hal_modem_at_set_log_filter(modem_at, secrets, COUNTOF(secrets));
   const hal_simcom_a76xx_result_t connect_result =
       hal_simcom_a76xx_mqtt_connect(modem, &mq);
   hal_modem_at_set_log_filter(modem_at, nullptr, 0);
