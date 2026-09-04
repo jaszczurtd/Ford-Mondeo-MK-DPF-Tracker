@@ -21,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ninja", type=Path)
     parser.add_argument("--toolchain-bin", type=Path)
     parser.add_argument("--host-environment", type=Path)
+    parser.add_argument("--jaszczurhal-root", type=Path)
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -105,6 +106,27 @@ def resolve_toolchain_bin(args: argparse.Namespace, state: dict[str, Any]) -> Pa
     raise RuntimeError(f"ARM toolchain was not found for {args.target}")
 
 
+def resolve_jaszczurhal_root(root_dir: Path, explicit: Path | None) -> Path:
+    candidates: list[Path] = []
+    if explicit is not None:
+        candidates.append(explicit)
+    candidates.extend(
+        (
+            root_dir.parent / "JaszczurHAL",
+            root_dir.parent.parent / "libraries" / "JaszczurHAL",
+        )
+    )
+
+    for candidate in candidates:
+        directory = candidate.expanduser().resolve()
+        if (directory / "src" / "hal" / "core" / "hal_array.h").is_file():
+            return directory
+    raise RuntimeError(
+        "JaszczurHAL source tree was not found; install Credentials next to "
+        "JaszczurHAL or pass --jaszczurhal-root"
+    )
+
+
 def main() -> int:
     args = parse_args()
     root_dir = Path(__file__).resolve().parent.parent
@@ -125,6 +147,9 @@ def main() -> int:
             ("ninja", "ninja.exe"),
         )
         toolchain_bin = resolve_toolchain_bin(args, state)
+        jaszczurhal_root = resolve_jaszczurhal_root(
+            root_dir, args.jaszczurhal_root
+        )
     except RuntimeError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
@@ -146,6 +171,7 @@ def main() -> int:
         f"-DCMAKE_TOOLCHAIN_FILE={root_dir / 'cmake' / 'arm-none-eabi-toolchain.cmake'}",
         f"-DCREDENTIALS_TOOLCHAIN_BIN={toolchain_bin}",
         f"-DCREDENTIALS_TARGET={args.target}",
+        f"-DCREDENTIALS_JASZCZURHAL_ROOT={jaszczurhal_root}",
     ]
     build_command = [
         str(cmake),

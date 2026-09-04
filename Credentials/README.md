@@ -37,6 +37,10 @@ The result is `src/cortex-m0plus/libCredentials.a`. For STM32G474 use:
 
 The result is `build/stm32g474/libCredentials.a`.
 
+The builder locates JaszczurHAL next to the installed `Credentials` directory.
+For a different workspace layout, pass
+`--jaszczurhal-root /path/to/JaszczurHAL`.
+
 CI may create a fresh template with `scripts/configure.py --test`. That option
 uses only tracked, reserved example values (`example.invalid`, RFC 5737 IP
 addresses and a locally administered MAC). It refuses to run over any existing

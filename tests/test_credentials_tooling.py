@@ -96,6 +96,8 @@ class CredentialsToolingTests(unittest.TestCase):
     def test_build_dry_run_uses_managed_windows_tools(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            credentials = root / "Credentials"
+            shutil.copytree(REPO_ROOT / "Credentials", credentials)
             bin_dir = root / "GNU Arm bin"
             bin_dir.mkdir()
             for name in (
@@ -109,6 +111,10 @@ class CredentialsToolingTests(unittest.TestCase):
             ninja = root / "ninja.exe"
             cmake.touch()
             ninja.touch()
+            jaszczurhal = root / "JaszczurHAL"
+            array_header = jaszczurhal / "src" / "hal" / "core" / "hal_array.h"
+            array_header.parent.mkdir(parents=True)
+            array_header.touch()
             state = root / "host-environment.json"
             state.write_text(
                 json.dumps(
@@ -124,7 +130,7 @@ class CredentialsToolingTests(unittest.TestCase):
             )
 
             result = run_python(
-                REPO_ROOT / "Credentials" / "scripts" / "build.py",
+                credentials / "scripts" / "build.py",
                 "rp2040",
                 "--host-environment",
                 str(state),
@@ -137,6 +143,9 @@ class CredentialsToolingTests(unittest.TestCase):
             self.assertIn(str(cmake.resolve()), command["configure"][0])
             self.assertIn(f"-DCMAKE_MAKE_PROGRAM={ninja.resolve()}", joined)
             self.assertIn(f"-DCREDENTIALS_TOOLCHAIN_BIN={bin_dir.resolve()}", joined)
+            self.assertIn(
+                f"-DCREDENTIALS_JASZCZURHAL_ROOT={jaszczurhal.resolve()}", joined
+            )
 
     def test_toolchain_discovers_windows_executable_names(self) -> None:
         toolchain = (

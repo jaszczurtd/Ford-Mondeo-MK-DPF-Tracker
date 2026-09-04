@@ -4,9 +4,16 @@ project(Credentials LANGUAGES C CXX)
 
 set(CREDENTIALS_TARGET "" CACHE STRING "Target ABI: rp2040 or stm32g474")
 set_property(CACHE CREDENTIALS_TARGET PROPERTY STRINGS rp2040 stm32g474)
+set(CREDENTIALS_JASZCZURHAL_ROOT "" CACHE PATH
+    "Path to the JaszczurHAL source tree")
 
 if(NOT CREDENTIALS_TARGET MATCHES "^(rp2040|stm32g474)$")
     message(FATAL_ERROR "Set CREDENTIALS_TARGET to rp2040 or stm32g474")
+endif()
+if(NOT EXISTS
+   "${CREDENTIALS_JASZCZURHAL_ROOT}/src/hal/core/hal_array.h")
+    message(FATAL_ERROR
+        "Set CREDENTIALS_JASZCZURHAL_ROOT to the JaszczurHAL source tree")
 endif()
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config/CredentialsData.local.h" OR
    NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config/MacHostMapping.local.cpp")
@@ -20,6 +27,9 @@ add_library(Credentials STATIC
 target_include_directories(Credentials PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_include_directories(Credentials PRIVATE
+    "${CREDENTIALS_JASZCZURHAL_ROOT}/src"
 )
 target_compile_features(Credentials PRIVATE cxx_std_17)
 target_compile_options(Credentials PRIVATE
