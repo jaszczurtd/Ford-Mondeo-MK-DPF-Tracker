@@ -25,5 +25,6 @@ static const char *const CREDENTIAL_VALUES[CR_LAST] = {
     "time.example.invalid",                 // CR_NTPSERVER0
     "time.example.invalid",                 // CR_NTPSERVER1
     "time.example.invalid",                 // CR_NTPSERVER2
-    "ci-example-ca-certificate"             // CR_CA_CERT
+    "ci-example-ca-certificate",            // CR_CA_CERT
+    "0000"                                  // CR_SIM_PIN
 };

@@ -54,6 +54,8 @@ static void clearAndFreeSecret(char *secret) {
 }
 
 static bool modem_ready = false;
+// Set after the SIM rejects the PIN; it is not sent again until reboot.
+static bool sim_pin_rejected = false;
 static bool mqtt_connected = false;
 static bool watchdog_reboot_status_pending = false;
 static uint32_t last_sensor_ms = 0;
@@ -657,6 +659,31 @@ static hal_simcom_a76xx_result_t updateCellLocation() {
 // MODEM INITIALIZATION
 // =============================================================
 
+// Sends the PIN only when the SIM asks for it. Every wrong PIN uses up one
+// of the SIM's attempts, so a rejected PIN is never retried.
+static bool modemUnlockSim() {
+  hal_simcom_a76xx_sim_state_t sim = HAL_SIMCOM_A76XX_SIM_READY;
+  if (hal_simcom_a76xx_get_sim_state(modem, &sim) != HAL_SIMCOM_A76XX_OK ||
+      sim != HAL_SIMCOM_A76XX_SIM_PIN) {
+    return true;  // other states are reported by wait_sim_ready()
+  }
+
+  if (sim_pin_rejected) {
+    setCriticalError(ERR_SIM_NOT_READY, "SIM PIN rejected earlier, not retrying");
+    return false;
+  }
+
+  char *pin = getCredential(CR_SIM_PIN);
+  hal_simcom_a76xx_result_t r = hal_simcom_a76xx_set_pin(modem, pin);
+  clearAndFreeSecret(pin);
+  if (r != HAL_SIMCOM_A76XX_OK) {
+    sim_pin_rejected = true;
+    setCriticalError(ERR_SIM_NOT_READY, "SIM PIN rejected");
+    return false;
+  }
+  return true;
+}
+
 bool modemInit() {
   if (modem_serial == nullptr) {
     modem_serial = hal_uart_create(HAL_UART_PORT_2, PIN_MODEM_RX, PIN_MODEM_TX);
@@ -714,8 +741,7 @@ bool modemInit() {
     deb("[GNSS] enable failed (err=%d)", (int)gr);
   }
 
-  if(hal_simcom_a76xx_set_pin(modem, getCredential(CR_SIM_PIN)) != HAL_SIMCOM_A76XX_OK) {
-    setCriticalError(ERR_SIM_NOT_READY, "SIM PIN failed");
+  if (!modemUnlockSim()) {
     return false;
   }
 

@@ -171,6 +171,10 @@ The firmware brings up the modem, waits for SIM and network registration, attach
 
 The modem is also used as the source for network time, GNSS location, and cellular location context. GNSS is queried every 5 seconds when the modem is ready; cellular location is queried every 15 seconds.
 
+If the SIM card is PIN-locked, the firmware sends `CR_SIM_PIN` from Credentials. A rejected PIN is not retried.
+
+Step-by-step modem setup and a manual TLS MQTT connection test using AT commands: [English](docs/A7670E.en.md), [Polski](docs/A7670E.pl.md).
+
 ## MQTT Telemetry
 
 Telemetry is sampled as compact JSON every 2 seconds and queued in RAM for `dpf/data`. While MQTT is connected, the firmware drains this queue and removes each payload only after a successful publish. This keeps short MQTT outages from creating gaps in the slow temperature/pressure trend.
