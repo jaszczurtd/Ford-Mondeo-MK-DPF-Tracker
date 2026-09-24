@@ -714,6 +714,11 @@ bool modemInit() {
     deb("[GNSS] enable failed (err=%d)", (int)gr);
   }
 
+  if(hal_simcom_a76xx_set_pin(modem, getCredential(CR_SIM_PIN)) != HAL_SIMCOM_A76XX_OK) {
+    setCriticalError(ERR_SIM_NOT_READY, "SIM PIN failed");
+    return false;
+  }
+
   if (hal_simcom_a76xx_wait_sim_ready(modem, 5000) != HAL_SIMCOM_A76XX_OK) {
     setCriticalError(ERR_SIM_NOT_READY, "SIM not ready");
     return false;
