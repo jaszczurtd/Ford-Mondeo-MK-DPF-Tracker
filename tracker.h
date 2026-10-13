@@ -13,7 +13,6 @@
 #define VERSION  "v0.5"
 
 #define DEBUG_SERIAL_FLUSH_ENABLED false
-#define MODEM_BAUD_RATE 115200UL
 
 #define MQTT_CLIENT_ID    "dpf-tracker"
 #define MQTT_TOPIC_DATA   "dpf/data"
@@ -28,18 +27,14 @@
 #define APN               "internet"
 #define SSL_CA_CERT       "ca.pem"
 
-#define PIN_MODEM_TX      4
-#define PIN_MODEM_RX      5
-#define PIN_I2C_SDA       0
-#define PIN_I2C_SCL       1
-#define PIN_ADC_DP        26
-#define PIN_PUMP_PULSE    2
-#define PIN_GLOW_PLUG     3
-#define PIN_MODEM_PWR     6
-#define PIN_RGB           16
-
-#define MCP9600_ADDR_PRE_DPF   0x60
-#define MCP9600_ADDR_MID_DPF   0x67
+// Pins, buses and addresses come from the assembly of device_tree.json
+// through the JH_HW_* macros of the generated jh_hardware.h. The status LED
+// (HAL_BOARD_STATUS_LED_PIN) is the board's WS2812 on the RP2040-Zero and a
+// WS2812 on the Nucleo header.
+#if !defined(HAL_BOARD_STATUS_LED_KIND_ADDRESSABLE) || \
+    !defined(HAL_BOARD_STATUS_LED_PIXEL_ORDER_GRB)
+#error "the tracker shows its status on a GRB WS2812 status LED"
+#endif
 
 #define SENSOR_INTERVAL_MS     500
 #define MQTT_PUBLISH_INTERVAL  2000

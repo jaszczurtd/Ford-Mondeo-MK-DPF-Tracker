@@ -1,7 +1,6 @@
 /*
- * DPF Regeneration Tracker - Firmware RP2040 (RP2040-Zero)
- * =========================================================
- * v0.4 - RP2040-Zero, RGB NeoPixel LED, watchdog fixes
+ * DPF Regeneration Tracker - firmware (version in VERSION, tracker.h)
+ * ===================================================================
  *
  * Monitors the DPF regeneration system (Mondeo Mk4 2.0 TDCi PSA):
  *   - 2x EGT probe (K-type thermocouple) via MCP9600 (I2C)
@@ -11,16 +10,7 @@
  *
  * Sends data over LTE Cat-1 (A7670E) -> MQTT/TLS -> Mosquitto (RPi5)
  *
- * Pinout:
- *   GPIO0  - I2C0 SDA (MCP9600 x2)
- *   GPIO1  - I2C0 SCL (MCP9600 x2)
- *   GPIO2  - interrupt: dosing pump pulses
- *   GPIO3  - interrupt: glow plug state
- *   GPIO4  - Serial2 TX -> modem RX
- *   GPIO5  - Serial2 RX ← modem TX
- *   GPIO6  - modem power relay
- *   GPIO16 - NeoPixel RGB LED (RP2040-Zero)
- *   GPIO26 - ADC0: differential pressure sensor
+ * The wiring of each board is in the assemblies of device_tree.json.
  */
 
 #include "tracker.h"
@@ -337,7 +327,7 @@ char* buildWatchdogRebootStatusPayload();
 // =============================================================
 
 void ledInit() {
-  hal_rgb_led_init_ex(PIN_RGB, 1, HAL_RGB_LED_PIXEL_GRB_KHZ800);
+  hal_rgb_led_init_ex(HAL_BOARD_STATUS_LED_PIN, 1, HAL_RGB_LED_PIXEL_GRB_KHZ800);
 }
 
 void ledSetStatus(LedStatus s) {
@@ -404,7 +394,7 @@ void smartDelay(uint32_t ms) {
 
 void isr_pump_pulse() {
   uint32_t now = hal_micros();
-  bool pump_on = !hal_gpio_read(PIN_PUMP_PULSE);
+  bool pump_on = !hal_gpio_read(JH_HW_NODE_PUMP_PULSE_PIN_IN);
 
   if (pump_on == sensors.pump_state) {
     return;
@@ -433,7 +423,7 @@ void isr_glow_plug() {
 
   // NPN common-emitter: inverted logic
   // LOW = glow plug ON, HIGH = glow plug OFF
-  bool pin_low = !hal_gpio_read(PIN_GLOW_PLUG);
+  bool pin_low = !hal_gpio_read(JH_HW_NODE_GLOW_PLUG_PIN_IN);
   if (pin_low == sensors.glow_state) {
     return;
   }
@@ -458,20 +448,20 @@ void isr_glow_plug() {
 //
 // The A7670E module on this board has NO PWRKEY broken out - it boots
 // the moment VCC is applied. Power is gated by an external relay
-// driven from PIN_MODEM_PWR:
+// driven from JH_HW_NODE_MODEM_POWER_PIN_OUT:
 //   HIGH = relay closed = modem powered (idle state)
 //   LOW  = relay open   = modem unpowered
 //
 // That polarity matches hal_simcom_a76xx_power_toggle()'s waveform
-// (idle HIGH -> active-LOW pulse -> HIGH), so we wire PIN_MODEM_PWR as
+// (idle HIGH -> active-LOW pulse -> HIGH), so we wire that pin as
 // the driver's pwr_pin and reuse the HAL helper for power-cycling.
 // We don't call hal_simcom_a76xx_hard_reset() because it issues two
 // pulses with a 5 s gap (PWRKEY "force off then back on" semantics);
 // for a relay-gated module a single power-cycle is sufficient.
 
 static void modemPwrInit() {
-  hal_gpio_set_mode(PIN_MODEM_PWR, HAL_GPIO_OUTPUT);
-  hal_gpio_write(PIN_MODEM_PWR, true);  // power on (relay closed)
+  hal_gpio_set_mode(JH_HW_NODE_MODEM_POWER_PIN_OUT, HAL_GPIO_OUTPUT);
+  hal_gpio_write(JH_HW_NODE_MODEM_POWER_PIN_OUT, true);  // power on (relay closed)
 }
 
 // Power-cycle the modem through the relay and wait for it to boot.
@@ -686,7 +676,9 @@ static bool modemUnlockSim() {
 
 bool modemInit() {
   if (modem_serial == nullptr) {
-    modem_serial = hal_uart_create(HAL_UART_PORT_2, PIN_MODEM_RX, PIN_MODEM_TX);
+    modem_serial = hal_uart_create((hal_uart_port_t)JH_HW_BUS_MODEM_UART_UART_PORT,
+                                   JH_HW_BUS_MODEM_UART_PIN_RX,
+                                   JH_HW_BUS_MODEM_UART_PIN_TX);
   }
 
   if (modem_serial == nullptr) {
@@ -694,12 +686,14 @@ bool modemInit() {
     return false;
   }
 
-  hal_uart_set_tx(modem_serial, PIN_MODEM_TX);
-  hal_uart_set_rx(modem_serial, PIN_MODEM_RX);
-  hal_uart_begin(modem_serial, MODEM_BAUD_RATE, HAL_UART_CFG_8N1);
+  hal_uart_set_tx(modem_serial, JH_HW_BUS_MODEM_UART_PIN_TX);
+  hal_uart_set_rx(modem_serial, JH_HW_BUS_MODEM_UART_PIN_RX);
+  hal_uart_begin(modem_serial, JH_HW_BUS_MODEM_UART_BAUD_RATE,
+                 JH_HW_BUS_MODEM_UART_FRAME_CONFIG);
   deb("[UART] Modem serial via JaszczurHAL on GPIO%u/%u @ %lu",
-      (unsigned)PIN_MODEM_TX, (unsigned)PIN_MODEM_RX,
-      (unsigned long)MODEM_BAUD_RATE);
+      (unsigned)JH_HW_BUS_MODEM_UART_PIN_TX,
+      (unsigned)JH_HW_BUS_MODEM_UART_PIN_RX,
+      (unsigned long)JH_HW_BUS_MODEM_UART_BAUD_RATE);
 
   if (modem == nullptr) {
     hal_simcom_a76xx_config_t cfg = {};
@@ -707,7 +701,7 @@ bool modemInit() {
     // Wire the power-control relay into the HAL driver: its waveform
     // (idle HIGH -> active-LOW pulse -> HIGH) matches our relay polarity,
     // so modemHardResetRelay() can simply call power_toggle().
-    cfg.pwr_pin = PIN_MODEM_PWR;
+    cfg.pwr_pin = JH_HW_NODE_MODEM_POWER_PIN_OUT;
     cfg.rx_buf = modem_rx_buf;
     cfg.rx_buf_size = sizeof(modem_rx_buf);
     cfg.default_at_timeout_ms = 3000;
@@ -895,11 +889,11 @@ void sensorsInit() {
 
   hal_thermocouple_config_t egt_cfg = {};
   egt_cfg.chip             = HAL_THERMOCOUPLE_CHIP_MCP9600;
-  egt_cfg.bus.i2c.sda_pin  = PIN_I2C_SDA;
-  egt_cfg.bus.i2c.scl_pin  = PIN_I2C_SCL;
-  egt_cfg.bus.i2c.clock_hz = HAL_I2C_CLOCK_STANDARD_HZ;
-  egt_cfg.bus.i2c.i2c_bus  = 0;
-  egt_cfg.bus.i2c.i2c_addr = MCP9600_ADDR_PRE_DPF;
+  egt_cfg.bus.i2c.sda_pin  = JH_HW_BUS_I2C_PIN_SDA;
+  egt_cfg.bus.i2c.scl_pin  = JH_HW_BUS_I2C_PIN_SCL;
+  egt_cfg.bus.i2c.clock_hz = JH_HW_BUS_I2C_FREQUENCY_HZ;
+  egt_cfg.bus.i2c.i2c_bus  = JH_HW_BUS_I2C_INDEX;
+  egt_cfg.bus.i2c.i2c_addr = JH_HW_NODE_EGT_PRE_DPF_ADDRESS;
   egt_pre_dpf = hal_thermocouple_init(&egt_cfg);
   if (!egt_pre_dpf) {
     derr("[EGT] MCP9600 #1 not found!");
@@ -912,7 +906,7 @@ void sensorsInit() {
     deb("[EGT] MCP9600 #1 OK");
   }
 
-  egt_cfg.bus.i2c.i2c_addr = MCP9600_ADDR_MID_DPF;
+  egt_cfg.bus.i2c.i2c_addr = JH_HW_NODE_EGT_MID_DPF_ADDRESS;
   egt_mid_dpf = hal_thermocouple_init(&egt_cfg);
   if (!egt_mid_dpf) {
     derr("[EGT] MCP9600 #2 not found!");
@@ -925,21 +919,21 @@ void sensorsInit() {
     deb("[EGT] MCP9600 #2 OK");
   }
 
-  hal_gpio_set_mode(PIN_ADC_DP, HAL_GPIO_INPUT);
+  hal_gpio_set_mode(JH_HW_NODE_DPF_PRESSURE_PIN_IN, HAL_GPIO_INPUT);
 
-  hal_gpio_set_mode(PIN_PUMP_PULSE, HAL_GPIO_INPUT_PULLUP);
-  sensors.pump_state = !hal_gpio_read(PIN_PUMP_PULSE);
+  hal_gpio_set_mode(JH_HW_NODE_PUMP_PULSE_PIN_IN, HAL_GPIO_INPUT_PULLUP);
+  sensors.pump_state = !hal_gpio_read(JH_HW_NODE_PUMP_PULSE_PIN_IN);
   if (sensors.pump_state) {
     sensors.pump_on_us = hal_micros();
   }
-  hal_gpio_attach_interrupt(PIN_PUMP_PULSE, isr_pump_pulse, HAL_GPIO_IRQ_CHANGE);
+  hal_gpio_attach_interrupt(JH_HW_NODE_PUMP_PULSE_PIN_IN, isr_pump_pulse, HAL_GPIO_IRQ_CHANGE);
 
-  hal_gpio_set_mode(PIN_GLOW_PLUG, HAL_GPIO_INPUT_PULLUP);
-  sensors.glow_state = !hal_gpio_read(PIN_GLOW_PLUG);
+  hal_gpio_set_mode(JH_HW_NODE_GLOW_PLUG_PIN_IN, HAL_GPIO_INPUT_PULLUP);
+  sensors.glow_state = !hal_gpio_read(JH_HW_NODE_GLOW_PLUG_PIN_IN);
   if (sensors.glow_state) {
     sensors.glow_on_us = hal_micros();
   }
-  hal_gpio_attach_interrupt(PIN_GLOW_PLUG, isr_glow_plug, HAL_GPIO_IRQ_CHANGE);
+  hal_gpio_attach_interrupt(JH_HW_NODE_GLOW_PLUG_PIN_IN, isr_glow_plug, HAL_GPIO_IRQ_CHANGE);
 
 }
 
@@ -951,7 +945,7 @@ void sensorsRead() {
   sensors.egt_pre = hal_thermocouple_read(egt_pre_dpf);
   sensors.egt_mid = hal_thermocouple_read(egt_mid_dpf);
 
-  sensors.dp_raw = (uint16_t)hal_adc_read(PIN_ADC_DP);
+  sensors.dp_raw = (uint16_t)hal_adc_read(JH_HW_NODE_DPF_PRESSURE_PIN_IN);
   vadc = (sensors.dp_raw / ADC_MAX_VALUE) * ADC_VREF;
   sensors.dp_voltage = vadc * ADC_DIVIDER_RATIO;
   uint16_t dp_voltage_mv = voltageToMillivolts(sensors.dp_voltage);

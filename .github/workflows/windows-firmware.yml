@@ -71,23 +71,23 @@ jobs:
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
           $entry = '..\libraries\JaszczurHAL\vscode\entry\jh-vscode.cmd'
-          & $entry build --project . --target rp2040 --board rp2040-zero
+          & $entry build --project . --assembly rp2040-zero
           if ($LASTEXITCODE -ne 0) { throw 'RP2040 Tracker build failed.' }
-          & $entry refresh-intellisense --project . --target rp2040 --board rp2040-zero
+          & $entry refresh-intellisense --project . --assembly rp2040-zero
           if ($LASTEXITCODE -ne 0) { throw 'RP2040 IntelliSense refresh failed.' }
           New-Item -ItemType Directory -Path '.build\ci-artifacts' -Force | Out-Null
-          Copy-Item '.build\firmware.uf2' '.build\ci-artifacts\tracker-rp2040-zero.uf2'
+          Copy-Item '.build\rp2040\rp2040-zero\firmware.uf2' '.build\ci-artifacts\tracker-rp2040-zero.uf2'
 
       - name: Build STM32G474 Tracker and IntelliSense database
         shell: powershell
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
           $entry = '..\libraries\JaszczurHAL\vscode\entry\jh-vscode.cmd'
-          & $entry build --project . --target stm32g474 --board nucleo-g474re
+          & $entry build --project . --assembly nucleo
           if ($LASTEXITCODE -ne 0) { throw 'STM32G474 Tracker build failed.' }
-          & $entry refresh-intellisense --project . --target stm32g474 --board nucleo-g474re
+          & $entry refresh-intellisense --project . --assembly nucleo
           if ($LASTEXITCODE -ne 0) { throw 'STM32G474 IntelliSense refresh failed.' }
-          Copy-Item '.build\firmware.elf' '.build\ci-artifacts\tracker-stm32g474.elf'
+          Copy-Item '.build\stm32g474\nucleo\firmware.elf' '.build\ci-artifacts\tracker-stm32g474.elf'
 
       - name: Verify checkout stayed free of local credentials and archives
         shell: powershell

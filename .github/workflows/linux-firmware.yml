@@ -61,27 +61,27 @@ jobs:
         run: |
           set -eux
           ../libraries/JaszczurHAL/vscode/entry/jh-vscode build \
-            --project "$PWD" --target rp2040 --board rp2040-zero
+            --project "$PWD" --assembly rp2040-zero
           mkdir -p .build/ci-artifacts
-          cp .build/firmware.elf .build/ci-artifacts/tracker-rp2040-zero.elf
-          cp .build/firmware.uf2 .build/ci-artifacts/tracker-rp2040-zero.uf2
+          cp .build/rp2040/rp2040-zero/firmware.elf .build/ci-artifacts/tracker-rp2040-zero.elf
+          cp .build/rp2040/rp2040-zero/firmware.uf2 .build/ci-artifacts/tracker-rp2040-zero.uf2
 
       - name: Build RP2040 debug firmware and IntelliSense database
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
           set -eux
           ../libraries/JaszczurHAL/vscode/entry/jh-vscode build-debug \
-            --project "$PWD" --target rp2040 --board rp2040-zero
+            --project "$PWD" --assembly rp2040-zero
           ../libraries/JaszczurHAL/vscode/entry/jh-vscode refresh-intellisense \
-            --project "$PWD" --target rp2040 --board rp2040-zero
+            --project "$PWD" --assembly rp2040-zero
 
       - name: Build STM32G474 Tracker firmware
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
           set -eux
           ../libraries/JaszczurHAL/vscode/entry/jh-vscode build \
-            --project "$PWD" --target stm32g474 --board nucleo-g474re
-          cp .build/firmware.elf .build/ci-artifacts/tracker-stm32g474.elf
+            --project "$PWD" --assembly nucleo
+          cp .build/stm32g474/nucleo/firmware.elf .build/ci-artifacts/tracker-stm32g474.elf
 
       - name: Verify checkout stayed free of local credentials and archives
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker

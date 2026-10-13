@@ -11,10 +11,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MANAGED_DEBUG_PROFILES = {
-    "Project: Debug Firmware",
-    "Project: Debug Firmware (RP2350 ARM)",
-    "Project: Debug Firmware (STM32G474 / ST-Link)",
+# One profile per assembly of device_tree.json, each for its own ELF.
+DEBUG_PROFILES = {
+    "Project: Debug rp2040-zero (RP2040)":
+        ("rp2040/rp2040-zero", ["interface/cmsis-dap.cfg", "target/rp2040.cfg"]),
+    "Project: Debug nucleo (STM32G474 / ST-Link)":
+        ("stm32g474/nucleo", ["board/st_nucleo_g4.cfg"]),
 }
 
 
@@ -72,11 +74,11 @@ class VscodeProjectTests(unittest.TestCase):
             profile["name"]: profile
             for profile in json.loads(launch)["configurations"]
         }
-        self.assertEqual(set(profiles), MANAGED_DEBUG_PROFILES)
-        self.assertEqual(
-            profiles["Project: Debug Firmware (STM32G474 / ST-Link)"]["configFiles"],
-            ["board/st_nucleo_g4.cfg"],
-        )
+        self.assertEqual(set(profiles), set(DEBUG_PROFILES))
+        for name, (build, config_files) in DEBUG_PROFILES.items():
+            self.assertEqual("${workspaceFolder}/.build/" + build + "/firmware.elf",
+                             profiles[name]["executable"], name)
+            self.assertEqual(config_files, profiles[name]["configFiles"], name)
 
 
 if __name__ == "__main__":

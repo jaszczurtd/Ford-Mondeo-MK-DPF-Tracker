@@ -11,11 +11,24 @@ This project requires [JaszczurHAL](https://github.com/jaszczurtd/JaszczurHAL).
 The firmware links the external, precompiled
 `../libraries/Credentials/src/cortex-m0plus/libCredentials.a` library. A complete public replacement is provided in `Credentials/`; it contains no any secrets or private encoding code (you have to use your own secrets and compile your own libCredentials.a). See [Credentials setup](#credentials-setup).
 
-The physical tracker uses a Waveshare RP2040-Zero module. The tracked manifest
-selects JaszczurHAL target `rp2040` and board profile `rp2040-zero`, which build
-the firmware directly with the official Pico SDK. Other compatible RP board
-profiles can be selected for development when their pinout and board devices
-match the connected hardware.
+The physical tracker uses a Waveshare RP2040-Zero module. `device_tree.json`
+describes its wiring in the `rp2040-zero` assembly, which the tracked manifest
+selects and which builds directly with the official Pico SDK. The `nucleo`
+assembly wires the same devices to a NUCLEO-G474RE as a build check for
+STM32; no bench uses it yet:
+
+| Signal | RP2040-Zero | NUCLEO-G474RE (Arduino header) |
+| --- | --- | --- |
+| MCP9600 x2, I2C SDA / SCL | GP0 / GP1 (I2C0) | PB9 D14 / PB8 D15 (I2C1) |
+| Modem TX / RX | GP4 / GP5 (uart1) | PA9 D8 / PA10 D2 (USART1) |
+| Modem power relay | GP6 | PB5 D4 |
+| Dosing pump input | GP2 | PB4 D5 |
+| Glow plug input | GP3 | PB10 D6 |
+| DPF pressure, ADC | GP26 | PA0 A0 |
+| WS2812 status LED | GP16 (on the module) | PA8 D7 |
+
+USART2 (PA2/PA3) stays the STM32 debug console, so the modem uses USART1
+there.
 
 ## Credentials setup
 
@@ -88,10 +101,9 @@ developer preferences live in `.vscode/settings.json`.
 On Windows the generated tasks use `jaszczurhal.vscodeEntryWindows` and keep
 the COM port exclusively in the ignored `.vscode/jaszczurhal.local.json`.
 
-The tracked default configuration uses target `rp2040` and board
-`rp2040-zero`. Use `Project: Select board`, or pass `--target` and `--board` to
-`jh-vscode`, to create a local target selection without changing the tracked
-manifest.
+The tracked default configuration uses the `rp2040-zero` assembly. Use
+`Project: Select board`, or pass `--assembly` to `jh-vscode`, to create a local
+selection without changing the tracked manifest.
 
 From this firmware directory, the same build can be run manually:
 
@@ -99,14 +111,13 @@ From this firmware directory, the same build can be run manually:
 ../libraries/JaszczurHAL/vscode/entry/jh-vscode build --project .
 ```
 
-The selected board profile controls the Pico SDK board definition, flash size,
-GPIO capabilities, and upload defaults. Keep `rp2040-zero` for the physical
-tracker so its WS2812 status LED on GPIO16 is described correctly.
+The board of the selected assembly controls the Pico SDK board definition,
+flash size, GPIO capabilities, and upload defaults. Keep `rp2040-zero` for the
+physical tracker so its WS2812 status LED on GPIO16 is described correctly.
 
-The main generated artifacts are copied to `.build/firmware.elf`,
-`.build/firmware.bin`, and `.build/firmware.uf2`. Detailed linker output,
-including `firmware.elf.map`, remains in the resolved target/board directory
-below `.build/cmake/`.
+The generated artifacts of an assembly land in `.build/<target>/<assembly>/`,
+for example `.build/rp2040/rp2040-zero/firmware.uf2`, together with
+`firmware.elf`, `firmware.bin` and the linker map.
 
 The `Windows firmware` workflow repeats the non-secret Credentials setup,
 RP2040 and STM32G474 archive builds, both complete firmware builds and
@@ -199,7 +210,7 @@ Example `dpf/data` payload:
   "glow": 1,                         // Current vaporizer glow plug state: 1 = ON, 0 = OFF.
   "glow_dur": 1400,                  // Last completed glow plug ON duration.
   "glow_current_on_ms": 6200,        // Current glow plug ON duration when glow is ON.
-  "mcu_temp": 42.38,                 // RP2040 internal temperature, C.
+  "mcu_temp": 42.38,                 // MCU internal temperature, C.
   "data_queue_len": 3,               // Number of queued dpf/data payloads in RAM.
   "data_overflow_count": 0,          // Dropped dpf/data payload count due to RAM queue overflow.
   "event_queue_len": 12,             // Number of queued dpf/events records in RAM.
