@@ -113,6 +113,11 @@ python3 backend/scripts/run_unit_tests.py
 python3 backend/scripts/validate_migrations.py
 ```
 
+Na Linuksie `test_gpio.py` kompiluje też produkcyjny kod czujników
+natywnym GCC lub Clang C++ i sprawdza oba montaże ze zmienionym podciąganiem
+i polaryzacją. Ten test hostowy jest pomijany na Windows; workflow Windows
+nadal kompiluje oba montaże firmware.
+
 CI dla [Linuksa](../.github/workflows/linux-firmware.yml) i
 [Windows](../.github/workflows/windows-firmware.yml) uruchamia te same testy
 narzędzi z `tests/`. Wymagają one CMake, Ninja i GNU Arm dostępnych przez

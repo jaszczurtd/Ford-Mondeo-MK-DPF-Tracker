@@ -394,7 +394,8 @@ void smartDelay(uint32_t ms) {
 
 void isr_pump_pulse() {
   uint32_t now = hal_micros();
-  bool pump_on = !hal_gpio_read(JH_HW_NODE_PUMP_PULSE_PIN_IN);
+  bool pump_on = (hal_gpio_read(JH_HW_NODE_PUMP_PULSE_PIN_IN) !=
+      (JH_HW_NODE_PUMP_PULSE_PROP_ACTIVE_LOW != 0));
 
   if (pump_on == sensors.pump_state) {
     return;
@@ -421,14 +422,13 @@ void isr_pump_pulse() {
 void isr_glow_plug() {
   uint32_t now = hal_micros();
 
-  // NPN common-emitter: inverted logic
-  // LOW = glow plug ON, HIGH = glow plug OFF
-  bool pin_low = !hal_gpio_read(JH_HW_NODE_GLOW_PLUG_PIN_IN);
-  if (pin_low == sensors.glow_state) {
+  bool glow_on = (hal_gpio_read(JH_HW_NODE_GLOW_PLUG_PIN_IN) !=
+      (JH_HW_NODE_GLOW_PLUG_PROP_ACTIVE_LOW != 0));
+  if (glow_on == sensors.glow_state) {
     return;
   }
 
-  if (pin_low) {
+  if (glow_on) {
     sensors.glow_state = true;
     sensors.glow_on_us = now;
   } else {
@@ -439,7 +439,7 @@ void isr_glow_plug() {
     }
   }
 
-  eventQueuePushFromIsr(TRACKER_EVENT_GLOW, pin_low, now);
+  eventQueuePushFromIsr(TRACKER_EVENT_GLOW, glow_on, now);
 }
 
 // =============================================================
@@ -921,15 +921,17 @@ void sensorsInit() {
 
   hal_gpio_set_mode(JH_HW_NODE_DPF_PRESSURE_PIN_IN, HAL_GPIO_INPUT);
 
-  hal_gpio_set_mode(JH_HW_NODE_PUMP_PULSE_PIN_IN, HAL_GPIO_INPUT_PULLUP);
-  sensors.pump_state = !hal_gpio_read(JH_HW_NODE_PUMP_PULSE_PIN_IN);
+  hal_gpio_set_mode(JH_HW_NODE_PUMP_PULSE_PIN_IN, JH_HW_NODE_PUMP_PULSE_INPUT_MODE);
+  sensors.pump_state = (hal_gpio_read(JH_HW_NODE_PUMP_PULSE_PIN_IN) !=
+      (JH_HW_NODE_PUMP_PULSE_PROP_ACTIVE_LOW != 0));
   if (sensors.pump_state) {
     sensors.pump_on_us = hal_micros();
   }
   hal_gpio_attach_interrupt(JH_HW_NODE_PUMP_PULSE_PIN_IN, isr_pump_pulse, HAL_GPIO_IRQ_CHANGE);
 
-  hal_gpio_set_mode(JH_HW_NODE_GLOW_PLUG_PIN_IN, HAL_GPIO_INPUT_PULLUP);
-  sensors.glow_state = !hal_gpio_read(JH_HW_NODE_GLOW_PLUG_PIN_IN);
+  hal_gpio_set_mode(JH_HW_NODE_GLOW_PLUG_PIN_IN, JH_HW_NODE_GLOW_PLUG_INPUT_MODE);
+  sensors.glow_state = (hal_gpio_read(JH_HW_NODE_GLOW_PLUG_PIN_IN) !=
+      (JH_HW_NODE_GLOW_PLUG_PROP_ACTIVE_LOW != 0));
   if (sensors.glow_state) {
     sensors.glow_on_us = hal_micros();
   }

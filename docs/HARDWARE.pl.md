@@ -29,6 +29,10 @@ Sygnały po obwodach wejściowych są aktywne stanem niskim: zbocze opadające
 oznacza ON, a narastające OFF. Sygnały samochodu podłączaj przez obwody ze
 schematu. Firmware zapisuje zmiany, ignorując odczyty niezmienionego stanu.
 
+Ustawienia `pull` i `activeLow` pochodzą z węzłów `pumpPulse` i `glowPlug`
+w `device_tree.json`. Firmware stosuje je przy pierwszym odczycie i w
+procedurach przerwań. Dostarczone montaże zachowują opisane wyżej poziomy.
+
 ## Pomiary
 
 Obie termopary są typu K. Firmware ustawia MCP9600 na 18-bitowy ADC,

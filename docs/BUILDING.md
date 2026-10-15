@@ -114,6 +114,11 @@ python3 backend/scripts/run_unit_tests.py
 python3 backend/scripts/validate_migrations.py
 ```
 
+On Linux, `test_gpio.py` also compiles the production sensor code with
+native GCC or Clang C++ and checks both assemblies with altered pull and
+polarity settings. This host probe is skipped on Windows; the Windows
+workflow still builds both firmware assemblies.
+
 Both [Linux](../.github/workflows/linux-firmware.yml) and
 [Windows](../.github/workflows/windows-firmware.yml) CI run the same tooling
 tests from `tests/`. These require CMake, Ninja and GNU Arm, available through

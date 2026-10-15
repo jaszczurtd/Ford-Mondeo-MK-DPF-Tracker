@@ -29,6 +29,10 @@ conditioned MCU signals are active low: falling means ON and rising means
 OFF. Use the schematic's input frontends for vehicle signals. The firmware
 records transitions and ignores repeated reads of an unchanged state.
 
+Input `pull` and `activeLow` come from `pumpPulse` and `glowPlug` in
+`device_tree.json`. Firmware applies them both during initial sampling and
+in the interrupt handlers. The supplied assemblies retain the levels above.
+
 ## Measurements
 
 Both thermocouples are type K. Firmware configures MCP9600 for 18-bit ADC,
