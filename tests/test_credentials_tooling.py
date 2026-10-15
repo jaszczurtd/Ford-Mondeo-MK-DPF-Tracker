@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+JASZCZURHAL = REPO_ROOT.parent / "libraries" / "JaszczurHAL"
 
 
 def run_python(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -21,6 +22,51 @@ def run_python(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+    )
+
+
+def template_with_managed_tools(root: Path) -> tuple[Path, Path]:
+    """A template copy and a Windows host record naming managed GNU Arm and
+    RISC-V compilers, CMake and Ninja that exist only as empty files."""
+    credentials = root / "Credentials"
+    shutil.copytree(REPO_ROOT / "Credentials", credentials)
+    compilers = {}
+    for directory, prefix in (
+        (root / "GNU Arm bin", "arm-none-eabi"),
+        (root / "RISC-V" / "bin", "riscv32-unknown-elf"),
+    ):
+        directory.mkdir(parents=True)
+        for tool in ("gcc", "g++", "ar", "ranlib"):
+            (directory / f"{prefix}-{tool}.exe").touch()
+        compilers[prefix] = str(directory / f"{prefix}-gcc.exe")
+    for name in ("cmake.exe", "ninja.exe"):
+        (root / name).touch()
+    state = root / "host-environment.json"
+    state.write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "cmake": str(root / "cmake.exe"),
+                    "ninja": str(root / "ninja.exe"),
+                    "gnu-arm": compilers["arm-none-eabi"],
+                    "riscv": compilers["riscv32-unknown-elf"],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    return credentials, state
+
+
+def dry_run(credentials: Path, state: Path, target: str) -> subprocess.CompletedProcess[str]:
+    return run_python(
+        credentials / "scripts" / "build.py",
+        target,
+        "--host-environment",
+        str(state),
+        "--jaszczurhal-root",
+        str(JASZCZURHAL),
+        "--dry-run",
     )
 
 
@@ -96,70 +142,74 @@ class CredentialsToolingTests(unittest.TestCase):
     def test_build_dry_run_uses_managed_windows_tools(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            credentials = root / "Credentials"
-            shutil.copytree(REPO_ROOT / "Credentials", credentials)
-            bin_dir = root / "GNU Arm bin"
-            bin_dir.mkdir()
-            for name in (
-                "arm-none-eabi-gcc.exe",
-                "arm-none-eabi-g++.exe",
-                "arm-none-eabi-ar.exe",
-                "arm-none-eabi-ranlib.exe",
-            ):
-                (bin_dir / name).touch()
-            cmake = root / "cmake.exe"
-            ninja = root / "ninja.exe"
-            cmake.touch()
-            ninja.touch()
-            jaszczurhal = root / "JaszczurHAL"
-            array_header = jaszczurhal / "src" / "hal" / "core" / "hal_array.h"
-            array_header.parent.mkdir(parents=True)
-            array_header.touch()
-            state = root / "host-environment.json"
-            state.write_text(
-                json.dumps(
-                    {
-                        "tools": {
-                            "cmake": str(cmake),
-                            "ninja": str(ninja),
-                            "gnu-arm": str(bin_dir / "arm-none-eabi-gcc.exe"),
-                        }
-                    }
-                ),
-                encoding="utf-8",
-            )
+            credentials, state = template_with_managed_tools(root)
 
-            result = run_python(
-                credentials / "scripts" / "build.py",
-                "rp2040",
-                "--host-environment",
-                str(state),
-                "--dry-run",
-            )
+            result = dry_run(credentials, state, "rp2040")
 
             self.assertEqual(result.returncode, 0, result.stderr)
             command = json.loads(result.stdout)
             joined = " ".join(command["configure"])
-            self.assertIn(str(cmake.resolve()), command["configure"][0])
-            self.assertIn(f"-DCMAKE_MAKE_PROGRAM={ninja.resolve()}", joined)
-            self.assertIn(f"-DCREDENTIALS_TOOLCHAIN_BIN={bin_dir.resolve()}", joined)
-            self.assertIn(
-                f"-DCREDENTIALS_JASZCZURHAL_ROOT={jaszczurhal.resolve()}", joined
+            self.assertIn(str((root / "cmake.exe").resolve()), command["configure"][0])
+            self.assertIn(f"-DCMAKE_MAKE_PROGRAM={(root / 'ninja.exe').resolve()}", joined)
+            self.assertIn("-DPICO_PLATFORM=rp2040", joined)
+            self.assertIn(f"-DPICO_TOOLCHAIN_PATH={(root / 'GNU Arm bin').resolve()}", joined)
+            self.assertIn(f"-DCREDENTIALS_JASZCZURHAL_ROOT={JASZCZURHAL.resolve()}", joined)
+            self.assertEqual(
+                str(credentials.resolve() / "src" / "cortex-m0plus" / "libCredentials.a"),
+                command["archive"],
             )
 
-    def test_toolchain_discovers_windows_executable_names(self) -> None:
-        toolchain = (
-            REPO_ROOT / "Credentials" / "cmake" / "arm-none-eabi-toolchain.cmake"
-        ).read_text(encoding="utf-8")
-        self.assertIn("find_program", toolchain)
-        for name in (
-            "arm-none-eabi-gcc.exe",
-            "arm-none-eabi-g++.exe",
-            "arm-none-eabi-ar.exe",
-            "arm-none-eabi-ranlib.exe",
-        ):
-            self.assertIn(name, toolchain)
+    def test_each_target_builds_with_its_firmware_toolchain(self) -> None:
+        # The toolchain of the JaszczurHAL firmware build of each target, so
+        # the archive has the firmware's ABI.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            credentials, state = template_with_managed_tools(root)
+            arm = (root / "GNU Arm bin").resolve()
+            riscv = (root / "RISC-V" / "bin").resolve()
+            hal = JASZCZURHAL.resolve()
+            idf = hal / "third_party" / "esp-idf" / "tools" / "cmake"
+            expected = {
+                "rp2350-arm": ["-DPICO_PLATFORM=rp2350-arm-s", f"-DPICO_TOOLCHAIN_PATH={arm}"],
+                "rp2350-riscv": ["-DPICO_PLATFORM=rp2350-riscv", f"-DPICO_TOOLCHAIN_PATH={riscv}"],
+                "stm32g474": [
+                    "-DCMAKE_TOOLCHAIN_FILE="
+                    f"{hal / 'link_libraries' / 'stm32_lib' / 'toolchain_stm32g474.cmake'}",
+                    f"-DCMAKE_C_COMPILER={arm / 'arm-none-eabi-gcc.exe'}",
+                    f"-DCMAKE_CXX_COMPILER={arm / 'arm-none-eabi-g++.exe'}",
+                    f"-DCMAKE_AR={arm / 'arm-none-eabi-ar.exe'}",
+                    f"-DCMAKE_RANLIB={arm / 'arm-none-eabi-ranlib.exe'}",
+                ],
+                "esp32": [
+                    f"-DCMAKE_TOOLCHAIN_FILE={idf / 'toolchain-esp32.cmake'}",
+                    "-DCREDENTIALS_IDF_TARGET=esp32",
+                ],
+                "esp32s3": [
+                    f"-DCMAKE_TOOLCHAIN_FILE={idf / 'toolchain-esp32s3.cmake'}",
+                    "-DCREDENTIALS_IDF_TARGET=esp32s3",
+                ],
+            }
+            for target, definitions in expected.items():
+                with self.subTest(target=target):
+                    result = dry_run(credentials, state, target)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    command = json.loads(result.stdout)
+                    for definition in definitions:
+                        self.assertIn(definition, command["configure"])
+                    self.assertEqual(
+                        str(credentials.resolve() / "build" / target / "libCredentials.a"),
+                        command["archive"],
+                    )
 
+    def test_unknown_target_lists_the_known_ones(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            credentials, state = template_with_managed_tools(Path(temporary))
+
+            result = dry_run(credentials, state, "mock")
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("unknown target 'mock'", result.stderr)
+            self.assertIn("rp2350-arm", result.stderr)
 
 if __name__ == "__main__":
     unittest.main()

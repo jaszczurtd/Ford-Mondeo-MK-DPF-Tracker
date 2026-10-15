@@ -93,3 +93,6 @@ Thumbs.db
 AGENTS.md
 # jh-vscode user-local active board selection
 .vscode/jaszczurhal.local.json
+
+# Local work journal
+NOW.md

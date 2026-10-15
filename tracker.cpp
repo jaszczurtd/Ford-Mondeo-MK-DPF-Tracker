@@ -327,7 +327,7 @@ char* buildWatchdogRebootStatusPayload();
 // =============================================================
 
 void ledInit() {
-  hal_rgb_led_init_ex(HAL_BOARD_STATUS_LED_PIN, 1, HAL_RGB_LED_PIXEL_GRB_KHZ800);
+  (void)hal_rgb_led_init_board_status();
 }
 
 void ledSetStatus(LedStatus s) {

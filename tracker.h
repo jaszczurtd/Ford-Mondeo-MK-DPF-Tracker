@@ -30,10 +30,9 @@
 // Pins, buses and addresses come from the assembly of device_tree.json
 // through the JH_HW_* macros of the generated jh_hardware.h. The status LED
 // (HAL_BOARD_STATUS_LED_PIN) is the board's WS2812 on the RP2040-Zero and a
-// WS2812 on the Nucleo header.
-#if !defined(HAL_BOARD_STATUS_LED_KIND_ADDRESSABLE) || \
-    !defined(HAL_BOARD_STATUS_LED_PIXEL_ORDER_GRB)
-#error "the tracker shows its status on a GRB WS2812 status LED"
+// WS2812 on the Nucleo header; its colour order comes from the assembly.
+#if !defined(HAL_BOARD_STATUS_LED_KIND_ADDRESSABLE)
+#error "the tracker shows its status on an addressable status LED"
 #endif
 
 #define SENSOR_INTERVAL_MS     500

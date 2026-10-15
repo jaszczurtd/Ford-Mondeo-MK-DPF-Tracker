@@ -57,6 +57,7 @@ def main(argv: list[str]) -> int:
 
     from board_registry import tooling_target_registry
     from vscode_task_config import (
+        apply_project_view_settings,
         assembly_debug_builds,
         assembly_launch_document,
         keybindings_reference,
@@ -87,6 +88,12 @@ def main(argv: list[str]) -> int:
         or "../libraries/JaszczurHAL/vscode/entry/jh-vscode"
     )
     settings.update(vscode_entry_settings(unix_entry))
+    # IntelliSense follows the database of Project: Refresh IntelliSense.
+    apply_project_view_settings(
+        settings,
+        str(settings.get("C_Cpp.default.compileCommands")
+            or "${workspaceFolder}/.build/compile_commands_patched.json"),
+    )
 
     expected = {
         vscode_dir / "settings.json": json_text(settings),

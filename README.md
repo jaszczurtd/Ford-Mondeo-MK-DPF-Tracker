@@ -1,316 +1,43 @@
 # Mondeo DPF Tracker
 
-Mondeo DPF Tracker is firmware and electronics documentation for monitoring the DPF system in a Ford Mondeo MK4 2.0 TDCi.
-
-The project was created to collect real-world data from DPF operation and regeneration: exhaust gas temperatures, differential pressure signal, dosing pump activity, glow plug state, and vehicle operating context. The collected telemetry is intended to help reconstruct the factory DPF behavior and prepare a control algorithm for another car.
-
-Author: Marcin "Jaszczur" Kielesinski.
-
-This project requires [JaszczurHAL](https://github.com/jaszczurtd/JaszczurHAL).
-
-The firmware links the external, precompiled
-`../libraries/Credentials/src/cortex-m0plus/libCredentials.a` library. A complete public replacement is provided in `Credentials/`; it contains no any secrets or private encoding code (you have to use your own secrets and compile your own libCredentials.a). See [Credentials setup](#credentials-setup).
-
-The physical tracker uses a Waveshare RP2040-Zero module. `device_tree.json`
-describes its wiring in the `rp2040-zero` assembly, which the tracked manifest
-selects and which builds directly with the official Pico SDK. The `nucleo`
-assembly wires the same devices to a NUCLEO-G474RE as a build check for
-STM32; no bench uses it yet:
-
-| Signal | RP2040-Zero | NUCLEO-G474RE (Arduino header) |
-| --- | --- | --- |
-| MCP9600 x2, I2C SDA / SCL | GP0 / GP1 (I2C0) | PB9 D14 / PB8 D15 (I2C1) |
-| Modem TX / RX | GP4 / GP5 (uart1) | PA9 D8 / PA10 D2 (USART1) |
-| Modem power relay | GP6 | PB5 D4 |
-| Dosing pump input | GP2 | PB4 D5 |
-| Glow plug input | GP3 | PB10 D6 |
-| DPF pressure, ADC | GP26 | PA0 A0 |
-| WS2812 status LED | GP16 (on the module) | PA8 D7 |
-
-USART2 (PA2/PA3) stays the STM32 debug console, so the modem uses USART1
-there.
-
-## Credentials setup
-
-If `../libraries/Credentials` already exists, the build uses it unchanged. This
-is how the author's private `libCredentials.a` remains active. The setup script
-will never overwrite that directory.
-
-For a fresh checkout, install a private copy of the bundled template:
-
-```powershell
-py -3 scripts/setup_credentials.py
-```
-
-```bash
-./scripts/setup-credentials.sh
-```
-
-The command creates `../libraries/Credentials` and private configuration files.
-Fill in:
-
-```text
-../libraries/Credentials/config/CredentialsData.local.h
-../libraries/Credentials/config/MacHostMapping.local.cpp
-```
-
-Set `CREDENTIALS_LOCAL_CONFIGURED` to `1` after replacing every placeholder,
-then build the RP2040 archive:
-
-```powershell
-py -3 ../libraries/Credentials/scripts/build.py rp2040
-```
-
-```bash
-../libraries/Credentials/scripts/build.sh rp2040
-```
-
-The generated archive is:
-
-```text
-../libraries/Credentials/src/cortex-m0plus/libCredentials.a
-```
-
-Both `*.local.*` configuration files and generated archives are ignored by
-Git. Do not commit them. The template implements the public API without any
-encoding; users provide and own their credentials. Detailed instructions are
-in [Credentials/README.md](Credentials/README.md).
-
-For STM32G474, use `build.sh stm32g474`; the manifest links the resulting
-`build/stm32g474/libCredentials.a`.
-
-The setup command refuses an existing destination before copying anything, so
-the author's private library is never replaced. Automated builds use a fresh
-destination and `py -3 scripts/setup_credentials.py --test-config`; its values
-are public documentation fixtures and are not suitable for a real device.
-
-## Firmware build
-
-The application uses JaszczurHAL's portable `app_start()` and `app_task0()`
-entry points. The shared native dispatcher configures CMake for the selected
-target and board profile, then builds RP firmware with the official Pico SDK.
-
-The VS Code workflow is provided by JaszczurHAL's shared `jh-vscode` entrypoint.
-Stable module configuration lives in `.vscode/jaszczurhal.project.json`; local
-developer preferences live in `.vscode/settings.json`.
-
-- `jaszczurhal.uploadPort`
-- `jaszczurhal.root`
-- `jaszczurhal.vscodeEntry`
-
-On Windows the generated tasks use `jaszczurhal.vscodeEntryWindows` and keep
-the COM port exclusively in the ignored `.vscode/jaszczurhal.local.json`.
-
-The tracked default configuration uses the `rp2040-zero` assembly. Use
-`Project: Select board`, or pass `--assembly` to `jh-vscode`, to create a local
-selection without changing the tracked manifest.
-
-From this firmware directory, the same build can be run manually:
-
-```bash
-../libraries/JaszczurHAL/vscode/entry/jh-vscode build --project .
-```
-
-The board of the selected assembly controls the Pico SDK board definition,
-flash size, GPIO capabilities, and upload defaults. Keep `rp2040-zero` for the
-physical tracker so its WS2812 status LED on GPIO16 is described correctly.
-
-The generated artifacts of an assembly land in `.build/<target>/<assembly>/`,
-for example `.build/rp2040/rp2040-zero/firmware.uf2`, together with
-`firmware.elf`, `firmware.bin` and the linker map.
-
-The `Windows firmware` workflow repeats the non-secret Credentials setup,
-RP2040 and STM32G474 archive builds, both complete firmware builds and
-IntelliSense generation on a native `windows-2025` runner. Hardware upload is
-kept as a manual identity-guarded smoke test and is not attempted by a hosted
-runner.
-
-## Developer Workflow
-
-VS Code tasks and command-line workflow use the shared JaszczurHAL entrypoint:
-
-- `Project: Build`
-- `Project: Build (Debug)`
-- `Project: Upload`
-- `Project: Upload (UF2 / BOOTSEL)`
-- `Project: Serial Monitor`
-- `Project: Debug Probe Monitor`
-- `Project: Refresh IntelliSense`
-- `Project: Clear USB Identity`
-
-The Run and Debug view provides RP2040/RP2350 launch and attach profiles for a
-CMSIS-DAP Debug Probe. On native Windows, JaszczurHAL `runmefirst.ps1`
-configures the verified OpenOCD and GNU Arm paths in the user profile; the
-project launch file does not require machine-local Cortex-Debug variables.
-
-The old local firmware helpers under `scripts/` were removed during migration.
-The supported entrypoint is
-`../libraries/JaszczurHAL/vscode/entry/jh-vscode`.
-
-After changing the shared JaszczurHAL task registry, regenerate and verify the
-tracked VS Code files with:
-
-```powershell
-py -3 scripts/sync_vscode_project.py
-py -3 scripts/sync_vscode_project.py --check
-```
-
-## Board Architecture
-
-The tracker board is built as an RP2040-Zero based telemetry controller with a small set of automotive signal frontends. The RP2040 collects local measurements, timestamps the current operating state, and sends telemetry through an LTE modem to an MQTT broker.
-
-Main hardware blocks:
-
-- RP2040-Zero controller board running the tracker firmware.
-- Two K-type EGT thermocouple inputs, each handled by an MCP9600 I2C thermocouple amplifier.
-- Analog input for the DPF differential pressure sensor, read through the RP2040 ADC.
-- GPIO interrupt inputs for dosing pump pulses and vaporizer glow plug state.
-- LTE Cat-1 modem interface for remote telemetry and commands.
-- Modem power control through a relay, allowing the firmware to hard-reset the modem when connectivity cannot be restored.
-- On-board RGB status LED for connection, error, and publish activity feedback.
-
-The electronics files are in `materials/DPF_tracker/`:
-
-- Schematic: `materials/DPF_tracker/DPF_tracker.kicad_sch`
-- Exported PDF: `materials/DPF_tracker/DPF_tracker.pdf`
-
-## Modem
-
-Connectivity is handled by a SIMCom A7670E / A7670X Cat-1 LTE modem. The modem is connected to the RP2040 over UART and is managed through JaszczurHAL's SIMCom A76xx driver.
-
-The firmware brings up the modem, waits for SIM and network registration, attaches the PDP context, then opens an MQTT/TLS session. It publishes telemetry to `dpf/data`, queued control-signal events to `dpf/events`, status to `dpf/status`, and listens for commands on `dpf/cmd`. The current remote command contract includes `modem_reset`, which power-cycles the modem through the relay-controlled supply path.
-
-The modem is also used as the source for network time, GNSS location, and cellular location context. GNSS is queried every 5 seconds when the modem is ready; cellular location is queried every 15 seconds.
-
-If the SIM card is PIN-locked, the firmware sends `CR_SIM_PIN` from Credentials. A rejected PIN is not retried.
-
-Step-by-step modem setup and a manual TLS MQTT connection test using AT commands: [English](docs/A7670E.en.md), [Polski](docs/A7670E.pl.md).
-
-## MQTT Telemetry
-
-Telemetry is sampled as compact JSON every 2 seconds and queued in RAM for `dpf/data`. While MQTT is connected, the firmware drains this queue and removes each payload only after a successful publish. This keeps short MQTT outages from creating gaps in the slow temperature/pressure trend.
-
-Example `dpf/data` payload:
-
-```jsonc
-{
-  "version": "v0.4",                 // Firmware version.
-  "time": "2026-06-19T18:42:10+02:00", // Modem/network time when available.
-  "egt_pre": 312.45,                 // Pre-DPF exhaust gas temperature, C.
-  "egt_mid": 287.12,                 // Mid-DPF exhaust gas temperature, C.
-  "dp_voltage": 1.42,                // DPF differential pressure sensor voltage.
-  "dp_raw": 1762,                    // Raw ADC value for the pressure input.
-  "pump_onoff_period": 2.5,          // Dosing pump frequency estimate from ON/OFF timing.
-  "pump_freq_hz": 2.5,               // Dosing pump frequency estimate in Hz.
-  "pump_cnt": 5,                     // Pump ON edge count since the previous payload.
-  "pump": 1,                         // Current pump state: 1 = ON, 0 = OFF.
-  "pump_period_ms": 400,             // Period between recent pump ON edges.
-  "pump_last_on_ms": 82,             // Last completed pump ON duration.
-  "pump_current_on_ms": 37,          // Current pump ON duration when pump is ON.
-  "glow": 1,                         // Current vaporizer glow plug state: 1 = ON, 0 = OFF.
-  "glow_dur": 1400,                  // Last completed glow plug ON duration.
-  "glow_current_on_ms": 6200,        // Current glow plug ON duration when glow is ON.
-  "mcu_temp": 42.38,                 // MCU internal temperature, C.
-  "data_queue_len": 3,               // Number of queued dpf/data payloads in RAM.
-  "data_overflow_count": 0,          // Dropped dpf/data payload count due to RAM queue overflow.
-  "event_queue_len": 12,             // Number of queued dpf/events records in RAM.
-  "event_overflow_count": 0,         // Dropped event count due to RAM queue overflow.
-  "gnss_valid": 1,                   // GNSS fix validity: 1 = valid, 0 = invalid.
-  "gnss_powered": 1,                 // GNSS power state: 1 = powered, 0 = off/unavailable.
-  "gnss_error": 0,                   // GNSS read/status error code.
-  "gnss_age_ms": 850,                // Age of the latest GNSS fix.
-  "gnss_lat": 52.2297,               // GNSS latitude when valid.
-  "gnss_lng": 21.0122,               // GNSS longitude when valid.
-  "gnss_speed_kmh": 74.32,           // GNSS speed.
-  "gnss_alt_m": 112.5,               // GNSS altitude.
-  "gnss_course_deg": 184.2,          // GNSS course over ground.
-  "gnss_hdop": 0.9,                  // GNSS horizontal dilution of precision.
-  "gnss_sats_used": 9,               // Satellites used for the fix.
-  "gnss_sats_view": 15,              // Satellites visible.
-  "gnss_fix_mode": 3,                // GNSS fix mode reported by the modem.
-  "gnss_utc": "164210.000",          // GNSS UTC time when provided by the fix.
-  "cell_valid": 1,                   // Cellular location validity: 1 = valid, 0 = invalid.
-  "cell_error": 0,                   // Cellular location error code.
-  "cell_age_ms": 4200,               // Age of the latest cellular location estimate.
-  "cell_speed_kmh": 72.1,            // Cellular location speed estimate.
-  "cell_lat": 52.2301,               // Cellular location latitude when valid.
-  "cell_lng": 21.0118,               // Cellular location longitude when valid.
-  "cell_acc_m": 550,                 // Cellular location accuracy estimate in meters.
-  "ms": 1234567                      // Firmware uptime in milliseconds.
-}
-```
-
-Cellular location is approximate operating context, not a precise GPS route. Some GNSS and cellular location fields are omitted or set to unavailable values when no valid fix is available.
-
-Fast control-signal transitions are queued separately in a RAM ring buffer and published to `dpf/events` in batches. Events are removed from the queue only after a successful MQTT publish, so short MQTT outages do not lose pump/glow edge timing.
-
-Example `dpf/events` payload:
-
-```jsonc
-{
-  "version": "v0.4",                 // Firmware version.
-  "ms": 1234600,                     // Firmware uptime when this batch was prepared.
-  "batch_count": 2,                  // Number of events in this MQTT batch.
-  "queue_len": 2,                    // Queue length before or at batch preparation.
-  "queue_remaining_after_batch": 0,  // Events still queued after this batch is published.
-  "overflow_count": 0,               // Dropped event count due to RAM queue overflow.
-  "events": [
-    {
-      "seq": 1201,                   // Monotonic event sequence number.
-      "t_us": 1234100123,            // Firmware timestamp of the edge, microseconds.
-      "t_ms": 1234100,               // Firmware timestamp of the edge, milliseconds.
-      "src": "glow",                 // Event source: "pump" or "glow".
-      "state": 1,                    // Edge state: 1 = ON, 0 = OFF.
-      "gnss_speed_kmh": 74.32,       // Latest GNSS speed at the edge, or -1 if unavailable.
-      "dp_voltage": 1.42,            // Latest sampled DPF pressure sensor voltage.
-      "dp_sample_age_ms": 37         // Age of dp_voltage at the edge, or -1 if unavailable.
-    },
-    {
-      "seq": 1202,
-      "t_us": 1234123456,
-      "t_ms": 1234123,
-      "src": "pump",
-      "state": 1,
-      "gnss_speed_kmh": 74.32,
-      "dp_voltage": 1.43,
-      "dp_sample_age_ms": 81
-    }
-  ]
-}
-```
-
-The telemetry queue stores up to `DATA_QUEUE_CAPACITY` fixed-size payload slots, each limited by `DATA_PAYLOAD_MAX_SIZE`. The event batch also includes `queue_len`, `queue_remaining_after_batch`, and `overflow_count`. Both queues are finite; if either fills during a long outage, its overflow counter records that the in-RAM buffer was exhausted.
-
-DPF regeneration cycle detection should be done by combining both streams. `dpf/data` is the regular slow telemetry stream for pressure, temperature, location, and long-term state trends. `dpf/events` is the precise actuator edge stream for reconstructing pump and glow plug timing. Start/end conditions should primarily come from the pressure and temperature trends in `dpf/data`, while `dpf/events` describes what the factory controller did during that cycle.
-
-The status topic `dpf/status` publishes an online payload after MQTT connection:
-
-```jsonc
-{
-  "status": "online"                 // Tracker is connected to MQTT and publishing.
-}
-```
-
-If the previous application boot was caused by a real watchdog timeout, the firmware also publishes one watchdog status payload:
-
-```jsonc
-{
-  "status": "watchdog_reset",        // Status event type.
-  "reason": "watchdog",              // Reset reason reported by firmware.
-  "version": "v0.4",                 // Firmware version.
-  "ms": 12345                        // Firmware uptime when the status was published.
-}
-```
-
-Other reset causes are not reported as status events. The command topic `dpf/cmd` accepts the plain text command `modem_reset`.
-
-## Thermocouples
-
-The board uses two K-type thermocouple channels for exhaust gas temperature measurement:
-
-- pre-DPF EGT probe,
-- mid-DPF EGT probe.
-
-Both probes are read through MCP9600 I2C thermocouple amplifiers on the shared I2C bus. The firmware configures them as K-type sensors with high ADC resolution, ambient compensation, filtering, and publishes the resulting values as `egt_pre` and `egt_mid`.
+[Polski](README.pl.md)
+
+Mondeo DPF Tracker records DPF operation in a Ford Mondeo MK4 2.0 TDCi.
+It measures exhaust temperature and differential-pressure sensor voltage,
+records dosing-pump and glow-plug transitions, and sends telemetry through an
+LTE modem to MQTT. The data helps reconstruct the factory regeneration cycle
+and develop a controller for another vehicle.
+
+The physical tracker uses a Waveshare RP2040-Zero. A NUCLEO-G474RE assembly is
+provided for STM32 build checks; it has no confirmed bench installation.
+Firmware uses [JaszczurHAL](https://github.com/jaszczurtd/JaszczurHAL) and an
+external Credentials library. The bundled template lets you build that library
+with your own settings.
+
+## Start here
+
+- [Build, Credentials setup and upload](docs/BUILDING.md)
+- [Wiring, sensors and status LED](docs/HARDWARE.md)
+- [MQTT payloads, timing and queue limits](docs/TELEMETRY.md)
+- [Manual A7670E MQTT/TLS test](docs/A7670E.en.md)
+- [Backend installation, database and read-only API](backend/README.md)
+- [Credentials library reference](Credentials/README.md)
+
+The backend stores raw and normalized messages in PostgreSQL, groups device
+boots into sessions, builds analytical windows and exposes a read-only HTTP
+API. Visualization and automatic regeneration detection are planned.
+
+Both firmware queues live in RAM. Long outages can fill them, and restarting
+the tracker loses queued data. Pressure is reported as voltage until sensor
+calibration is available; see the telemetry guide for timing limitations.
+
+## Hardware files
+
+The [KiCad project](materials/DPF_tracker/DPF_tracker.kicad_pro),
+[schematic](materials/DPF_tracker/DPF_tracker.kicad_sch) and
+[schematic PDF](materials/DPF_tracker/DPF_tracker.pdf) are in `materials/DPF_tracker/`.
+Firmware wiring is defined in [device_tree.json](device_tree.json).
 
 ![Mondeo DPF Tracker](materials/20260604_013234.jpg)
+
+Author: Marcin "Jaszczur" Kielesinski.
