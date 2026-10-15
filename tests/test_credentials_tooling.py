@@ -3,17 +3,30 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 JASZCZURHAL = REPO_ROOT.parent / "libraries" / "JaszczurHAL"
+
+
+def load_builder(credentials: Path = REPO_ROOT / "Credentials"):
+    spec = importlib.util.spec_from_file_location(
+        "credentials_builder", credentials / "scripts" / "build.py"
+    )
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)
+    return builder
 
 
 def run_python(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -71,6 +84,148 @@ def dry_run(credentials: Path, state: Path, target: str) -> subprocess.Completed
 
 
 class CredentialsToolingTests(unittest.TestCase):
+    def test_windows_compiler_paths_survive_cmake_serialization(self) -> None:
+        # CMake writes these values into quoted set() calls in its compiler
+        # metadata. Exercise its parser even when this test runs on Linux.
+        class WindowsToolchainPath(PureWindowsPath):
+            def is_file(self) -> bool:
+                return self.name.endswith(".exe")
+
+        builder = load_builder()
+        cmake = shutil.which("cmake")
+        self.assertIsNotNone(cmake, "CMake is required for the path regression test")
+        tools = {
+            "CMAKE_C_COMPILER": "gcc",
+            "CMAKE_CXX_COMPILER": "g++",
+            "CMAKE_AR": "ar",
+            "CMAKE_RANLIB": "ranlib",
+        }
+        cases = (
+            (r"C:\jh\tools\gnu-arm\bin", "C:/jh/tools/gnu-arm/bin"),
+            (r"C:\Program Files\GNU Arm\bin", "C:/Program Files/GNU Arm/bin"),
+            (r"\\build-server\toolchains\GNU Arm\bin", "//build-server/toolchains/GNU Arm/bin"),
+        )
+        for native, expected in cases:
+            with self.subTest(path=native), tempfile.TemporaryDirectory() as temporary:
+                with patch.object(
+                    builder, "resolve_arm_bin", return_value=WindowsToolchainPath(native)
+                ), patch.object(sys, "path", sys.path.copy()):
+                    definitions, _ = builder.target_toolchain(
+                        SimpleNamespace(target="stm32g474"), {}, JASZCZURHAL
+                    )
+                values = dict(argument[2:].split("=", 1) for argument in definitions)
+                root = Path(temporary)
+                script = root / "compiler-paths.cmake"
+                script.write_text(
+                    "cmake_minimum_required(VERSION 3.20)\n"
+                    'file(WRITE "${CMAKE_CURRENT_LIST_DIR}/paths.txt" "")\n'
+                    + "".join(
+                        f'set({name} "{values[name]}")\n'
+                        f'file(APPEND "${{CMAKE_CURRENT_LIST_DIR}}/paths.txt" "${{{name}}}\\n")\n'
+                        for name in tools
+                    ),
+                    encoding="utf-8",
+                )
+                result = subprocess.run(
+                    [cmake, "-P", str(script)], check=False, capture_output=True, text=True
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(
+                    (root / "paths.txt").read_text(encoding="utf-8").splitlines(),
+                    [f"{expected}/arm-none-eabi-{tool}.exe" for tool in tools.values()],
+                )
+
+    def test_managed_toolchain_precedes_inherited_path_for_every_rp_and_stm32_target(self) -> None:
+        builder = load_builder()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            # Exercise equivalent paths on every host. Windows TEMP may also
+            # use an 8.3 name that resolve() expands to its long form.
+            alias_parent = root / "path alias"
+            alias_parent.mkdir()
+            _, state_file = template_with_managed_tools(alias_parent / "..")
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            inherited_path = str(root / "other tools")
+            with patch.dict(os.environ, {"PATH": inherited_path, "CREDENTIALS_TEST_ENV": "kept"}):
+                before = dict(os.environ)
+                for target in ("rp2040", "rp2350-arm", "rp2350-riscv", "stm32g474"):
+                    with self.subTest(target=target), patch.object(sys, "path", sys.path.copy()):
+                        key = "riscv" if target == "rp2350-riscv" else "gnu-arm"
+                        toolchain = Path(state["tools"][key]).parent
+                        _, environment = builder.target_toolchain(
+                            SimpleNamespace(target=target, toolchain_bin=toolchain),
+                            state,
+                            JASZCZURHAL,
+                        )
+                        self.assertIsNotNone(environment)
+                        self.assertEqual(
+                            environment["PATH"],
+                            os.pathsep.join((str(toolchain.resolve()), inherited_path)),
+                        )
+                        self.assertEqual(environment["CREDENTIALS_TEST_ENV"], "kept")
+                        self.assertEqual(dict(os.environ), before)
+
+    def test_stm32_build_finds_managed_compiler_in_nested_cmake_checks(self) -> None:
+        builder = load_builder()
+        state = builder.load_host_environment(REPO_ROOT / "Credentials", None)
+        tools = state.get("tools", {})
+        cmake = builder.resolve_program("CMake", None, tools.get("cmake"), ("cmake",))
+        ninja = builder.resolve_program("Ninja", None, tools.get("ninja"), ("ninja",))
+        arm = builder.resolve_arm_bin(
+            SimpleNamespace(target="stm32g474", toolchain_bin=None), state
+        )
+        compiler = arm / ("arm-none-eabi-gcc.exe" if os.name == "nt" else "arm-none-eabi-gcc")
+        with tempfile.TemporaryDirectory(prefix="credentials managed build ") as temporary:
+            root = Path(temporary)
+            credentials = root / "Credentials"
+            shutil.copytree(REPO_ROOT / "Credentials", credentials)
+            configured = run_python(credentials / "scripts" / "configure.py", "--test")
+            self.assertEqual(configured.returncode, 0, configured.stderr)
+            state_file = root / "host-environment.json"
+            state_file.write_text(
+                json.dumps({"tools": {
+                    "cmake": str(cmake), "ninja": str(ninja), "gnu-arm": str(compiler),
+                }}),
+                encoding="utf-8",
+            )
+            builder = load_builder(credentials)
+            real_run = subprocess.run
+            results = []
+
+            def run_isolated(command, **kwargs):
+                if "-S" in command:
+                    # CMake also searches /usr/bin without PATH. Disable that
+                    # fallback in the main configure AND its try_compile child.
+                    command = [
+                        *command,
+                        "-DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=OFF",
+                        "-DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_FIND_USE_CMAKE_SYSTEM_PATH",
+                    ]
+                result = real_run(command, capture_output=True, text=True, **kwargs)
+                results.append(result)
+                return result
+
+            empty_path = root / "empty path"
+            empty_path.mkdir()
+            argv = [
+                str(credentials / "scripts" / "build.py"), "stm32g474",
+                "--host-environment", str(state_file), "--jaszczurhal-root", str(JASZCZURHAL),
+            ]
+            with patch.dict(os.environ, {
+                "PATH": str(empty_path), "CMAKE_PROGRAM_PATH": "", "CMAKE_PREFIX_PATH": "",
+            }), \
+                    patch.object(sys, "argv", argv), patch.object(sys, "path", sys.path.copy()), \
+                    patch.object(builder.subprocess, "run", side_effect=run_isolated):
+                # Exercise an empty build directory and a subsequent cached build.
+                for attempt in ("fresh", "incremental"):
+                    results.clear()
+                    result = builder.main()
+                    output = "\n".join(r.stdout + r.stderr for r in results)
+                    self.assertEqual(result, 0, f"{attempt} build:\n{output}")
+                    self.assertEqual(len(results), 2)
+            archive = credentials / "build" / "stm32g474" / "libCredentials.a"
+            self.assertGreater(archive.stat().st_size, 0)
+
     def test_configure_test_creates_only_public_fixture_values(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             credentials = Path(temporary) / "Credentials"
@@ -150,10 +305,10 @@ class CredentialsToolingTests(unittest.TestCase):
             command = json.loads(result.stdout)
             joined = " ".join(command["configure"])
             self.assertIn(str((root / "cmake.exe").resolve()), command["configure"][0])
-            self.assertIn(f"-DCMAKE_MAKE_PROGRAM={(root / 'ninja.exe').resolve()}", joined)
+            self.assertIn(f"-DCMAKE_MAKE_PROGRAM={(root / 'ninja.exe').resolve().as_posix()}", joined)
             self.assertIn("-DPICO_PLATFORM=rp2040", joined)
-            self.assertIn(f"-DPICO_TOOLCHAIN_PATH={(root / 'GNU Arm bin').resolve()}", joined)
-            self.assertIn(f"-DCREDENTIALS_JASZCZURHAL_ROOT={JASZCZURHAL.resolve()}", joined)
+            self.assertIn(f"-DPICO_TOOLCHAIN_PATH={(root / 'GNU Arm bin').resolve().as_posix()}", joined)
+            self.assertIn(f"-DCREDENTIALS_JASZCZURHAL_ROOT={JASZCZURHAL.resolve().as_posix()}", joined)
             self.assertEqual(
                 str(credentials.resolve() / "src" / "cortex-m0plus" / "libCredentials.a"),
                 command["archive"],
@@ -170,22 +325,22 @@ class CredentialsToolingTests(unittest.TestCase):
             hal = JASZCZURHAL.resolve()
             idf = hal / "third_party" / "esp-idf" / "tools" / "cmake"
             expected = {
-                "rp2350-arm": ["-DPICO_PLATFORM=rp2350-arm-s", f"-DPICO_TOOLCHAIN_PATH={arm}"],
-                "rp2350-riscv": ["-DPICO_PLATFORM=rp2350-riscv", f"-DPICO_TOOLCHAIN_PATH={riscv}"],
+                "rp2350-arm": ["-DPICO_PLATFORM=rp2350-arm-s", f"-DPICO_TOOLCHAIN_PATH={arm.as_posix()}"],
+                "rp2350-riscv": ["-DPICO_PLATFORM=rp2350-riscv", f"-DPICO_TOOLCHAIN_PATH={riscv.as_posix()}"],
                 "stm32g474": [
                     "-DCMAKE_TOOLCHAIN_FILE="
-                    f"{hal / 'link_libraries' / 'stm32_lib' / 'toolchain_stm32g474.cmake'}",
-                    f"-DCMAKE_C_COMPILER={arm / 'arm-none-eabi-gcc.exe'}",
-                    f"-DCMAKE_CXX_COMPILER={arm / 'arm-none-eabi-g++.exe'}",
-                    f"-DCMAKE_AR={arm / 'arm-none-eabi-ar.exe'}",
-                    f"-DCMAKE_RANLIB={arm / 'arm-none-eabi-ranlib.exe'}",
+                    f"{(hal / 'link_libraries' / 'stm32_lib' / 'toolchain_stm32g474.cmake').as_posix()}",
+                    f"-DCMAKE_C_COMPILER={(arm / 'arm-none-eabi-gcc.exe').as_posix()}",
+                    f"-DCMAKE_CXX_COMPILER={(arm / 'arm-none-eabi-g++.exe').as_posix()}",
+                    f"-DCMAKE_AR={(arm / 'arm-none-eabi-ar.exe').as_posix()}",
+                    f"-DCMAKE_RANLIB={(arm / 'arm-none-eabi-ranlib.exe').as_posix()}",
                 ],
                 "esp32": [
-                    f"-DCMAKE_TOOLCHAIN_FILE={idf / 'toolchain-esp32.cmake'}",
+                    f"-DCMAKE_TOOLCHAIN_FILE={(idf / 'toolchain-esp32.cmake').as_posix()}",
                     "-DCREDENTIALS_IDF_TARGET=esp32",
                 ],
                 "esp32s3": [
-                    f"-DCMAKE_TOOLCHAIN_FILE={idf / 'toolchain-esp32s3.cmake'}",
+                    f"-DCMAKE_TOOLCHAIN_FILE={(idf / 'toolchain-esp32s3.cmake').as_posix()}",
                     "-DCREDENTIALS_IDF_TARGET=esp32s3",
                 ],
             }

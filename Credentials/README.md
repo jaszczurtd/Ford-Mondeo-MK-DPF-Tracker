@@ -49,6 +49,9 @@ The builder locates JaszczurHAL next to the installed Credentials directory.
 For another layout, pass `--jaszczurhal-root /path/to/JaszczurHAL`.
 It uses HAL-managed CMake, Ninja and compilers where available, otherwise
 resolving tools from `PATH`.
+For RP and STM32 builds, it prepends the selected compiler directory to the
+build processes' `PATH`, so CMake's nested compiler checks can find the same
+tools without changing your shell environment.
 
 RP targets use the Pico SDK toolchain selected for their platform; STM32 uses
 the HAL toolchain file. `rp2350-riscv` uses the RISC-V toolchain version selected

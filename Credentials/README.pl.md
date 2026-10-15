@@ -49,6 +49,9 @@ Skrypt szuka JaszczurHAL obok zainstalowanego katalogu Credentials. Przy innym
 układzie podaj `--jaszczurhal-root /path/to/JaszczurHAL`. Korzysta z CMake,
 Ninja i kompilatorów zarządzanych przez HAL, jeśli są dostępne; w przeciwnym
 razie szuka narzędzi w `PATH`.
+Podczas budowania dla RP i STM32 dodaje katalog wybranego kompilatora na
+początek `PATH` procesów kompilacji. Dzięki temu wewnętrzne testy CMake
+znajdują te same narzędzia, bez zmiany środowiska Twojej powłoki.
 
 Platformy RP używają toolchainu Pico SDK wybranego dla danej platformy,
 a STM32 — pliku toolchainu HAL. `rp2350-riscv` korzysta z wersji narzędzi

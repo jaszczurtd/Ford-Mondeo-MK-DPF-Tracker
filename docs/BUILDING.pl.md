@@ -108,12 +108,21 @@ Na Windows używaj `py -3` zamiast `python3`.
 Testy hostowe nie wymagają modemu, brokera, bazy danych ani prywatnych danych:
 
 ```bash
-python3 -m unittest discover -s tests -p 'test_*.py'
+python3 -m unittest discover -s tests -v
 python3 backend/scripts/run_unit_tests.py
 python3 backend/scripts/validate_migrations.py
 ```
 
-[Workflow Windows firmware](../.github/workflows/windows-firmware.yml)
+CI dla [Linuksa](../.github/workflows/linux-firmware.yml) i
+[Windows](../.github/workflows/windows-firmware.yml) uruchamia te same testy
+narzędzi z `tests/`. Wymagają one CMake, Ninja i GNU Arm dostępnych przez
+konfigurację hosta HAL lub `PATH`. Sprawdzają ścieżki kompilatorów Windows,
+w tym ścieżki ze spacjami i udziały sieciowe, oraz budują tymczasowe archiwum
+Credentials dla STM32 z wyłączonym szukaniem narzędzi w katalogach systemowych.
+Sprawdza to również odnajdywanie kompilatora w wewnętrznych testach CMake,
+gdy dostępny jest tylko wskazany toolchain.
+
+Workflow Windows firmware
 instaluje świeży szablon przez `scripts/setup_credentials.py --test-config`,
 buduje archiwa Credentials dla RP2040 i STM32, oba montaże firmware'u oraz
 bazy IntelliSense. Dane testowe są publiczne i nie służą konfiguracji urządzenia

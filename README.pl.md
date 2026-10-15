@@ -8,11 +8,11 @@ stanu pompki dozującej i świecy żarowej, a telemetrię wysyła przez modem LT
 do MQTT. Dane pomagają odtworzyć fabryczny cykl regeneracji i opracować
 sterownik dla innego samochodu.
 
-Fizyczny tracker używa Waveshare RP2040-Zero. Montaż NUCLEO-G474RE służy
-kontroli kompilacji STM32; nie ma potwierdzonego stanowiska sprzętowego.
+Fizyczny tracker używa Waveshare RP2040-Zero. Profil NUCLEO-G474RE służy
+kontroli kompilacji STM32.
 Firmware korzysta z [JaszczurHAL](https://github.com/jaszczurtd/JaszczurHAL)
-i zewnętrznej biblioteki Credentials. Dołączony szablon pozwala zbudować tę
-bibliotekę z własnymi ustawieniami.
+i zewnętrznej biblioteki Credentials do przechowywania haseł. Dołączony szablon
+pozwala zbudować tę bibliotekę z własnymi danymi.
 
 ## Od czego zacząć
 

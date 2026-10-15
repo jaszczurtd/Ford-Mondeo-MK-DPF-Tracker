@@ -171,6 +171,16 @@ def resolve_riscv_bin(
     return directory
 
 
+def toolchain_environment(toolchain: Path) -> dict[str, str]:
+    """Expose the selected compiler and binutils to nested CMake processes."""
+    environment = os.environ.copy()
+    inherited_path = environment.get("PATH")
+    environment["PATH"] = os.pathsep.join(
+        [str(toolchain), *([inherited_path] if inherited_path else [])]
+    )
+    return environment
+
+
 def target_toolchain(
     args: argparse.Namespace, state: dict[str, Any], jaszczurhal_root: Path
 ) -> tuple[list[str], dict[str, str] | None]:
@@ -199,21 +209,21 @@ def target_toolchain(
             toolchain = resolve_arm_bin(args, state)
         return [
             f"-DPICO_PLATFORM={build['platform']}",
-            f"-DPICO_TOOLCHAIN_PATH={toolchain}",
-        ], None
+            f"-DPICO_TOOLCHAIN_PATH={toolchain.as_posix()}",
+        ], toolchain_environment(toolchain)
     if entry["provider"] == "jh-stm32-baremetal":
         toolchain = resolve_arm_bin(args, state)
         suffix = ".exe" if (toolchain / "arm-none-eabi-gcc.exe").is_file() else ""
         names = {"gcc": "C_COMPILER", "g++": "CXX_COMPILER", "ar": "AR", "ranlib": "RANLIB"}
-        # The registry writes "${jhRoot}/..."; Path gives the host's separators
-        # (Windows would otherwise get "D:\...\JaszczurHAL/link_libraries/...").
+        # CMake serializes compiler paths into quoted strings. Forward slashes
+        # keep Windows backslashes from becoming CMake escape sequences.
         return [
-            f"-DCMAKE_TOOLCHAIN_FILE={Path(cache['CMAKE_TOOLCHAIN_FILE'])}",
+            f"-DCMAKE_TOOLCHAIN_FILE={Path(cache['CMAKE_TOOLCHAIN_FILE']).as_posix()}",
             *(
-                f"-DCMAKE_{names[tool]}={toolchain / f'arm-none-eabi-{tool}{suffix}'}"
+                f"-DCMAKE_{names[tool]}={(toolchain / f'arm-none-eabi-{tool}{suffix}').as_posix()}"
                 for tool in ARM_TOOLS
             ),
-        ], None
+        ], toolchain_environment(toolchain)
     if entry["provider"] == "esp-idf":
         from build_esp_idf import exported_environment, prepare_sdk
 
@@ -225,7 +235,7 @@ def target_toolchain(
             # ESP firmware build does.
             environment = exported_environment(prepare_sdk(jaszczurhal_root, ""))
         return [
-            f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
+            f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file.as_posix()}",
             f"-DCREDENTIALS_IDF_TARGET={build['idfTarget']}",
         ], environment
     raise RuntimeError(f"target {args.target!r} has no firmware toolchain")
@@ -274,11 +284,11 @@ def main() -> int:
         str(build_dir),
         "-G",
         "Ninja",
-        f"-DCMAKE_MAKE_PROGRAM={ninja}",
+        f"-DCMAKE_MAKE_PROGRAM={ninja.as_posix()}",
         *toolchain_args,
         f"-DCREDENTIALS_TARGET={args.target}",
-        f"-DCREDENTIALS_JASZCZURHAL_ROOT={jaszczurhal_root}",
-        f"-DCREDENTIALS_ARCHIVE_DIR={archive_dir}",
+        f"-DCREDENTIALS_JASZCZURHAL_ROOT={jaszczurhal_root.as_posix()}",
+        f"-DCREDENTIALS_ARCHIVE_DIR={archive_dir.as_posix()}",
     ]
     build_command = [
         str(cmake),

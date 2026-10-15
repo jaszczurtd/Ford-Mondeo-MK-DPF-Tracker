@@ -109,12 +109,20 @@ Use `py -3` instead of `python3` on Windows.
 Host checks do not require a modem, broker, database or private credentials:
 
 ```bash
-python3 -m unittest discover -s tests -p 'test_*.py'
+python3 -m unittest discover -s tests -v
 python3 backend/scripts/run_unit_tests.py
 python3 backend/scripts/validate_migrations.py
 ```
 
-The [Windows firmware workflow](../.github/workflows/windows-firmware.yml)
+Both [Linux](../.github/workflows/linux-firmware.yml) and
+[Windows](../.github/workflows/windows-firmware.yml) CI run the same tooling
+tests from `tests/`. These require CMake, Ninja and GNU Arm, available through
+HAL's host configuration or `PATH`. They check Windows compiler paths,
+including spaces and network shares, and build a temporary STM32 Credentials
+archive with system tool lookup disabled. This also checks compiler discovery
+in CMake's nested tests when only the selected toolchain is available.
+
+The Windows firmware workflow
 installs a fresh template with `scripts/setup_credentials.py --test-config`,
 builds RP2040 and STM32 Credentials archives, builds both firmware assemblies
 and refreshes IntelliSense. Test credentials are public fixtures and cannot

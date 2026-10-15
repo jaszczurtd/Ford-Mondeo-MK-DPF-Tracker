@@ -8,11 +8,11 @@ records dosing-pump and glow-plug transitions, and sends telemetry through an
 LTE modem to MQTT. The data helps reconstruct the factory regeneration cycle
 and develop a controller for another vehicle.
 
-The physical tracker uses a Waveshare RP2040-Zero. A NUCLEO-G474RE assembly is
-provided for STM32 build checks; it has no confirmed bench installation.
+The physical tracker uses a Waveshare RP2040-Zero. A NUCLEO-G474RE profile is
+provided for STM32 build checks.
 Firmware uses [JaszczurHAL](https://github.com/jaszczurtd/JaszczurHAL) and an
-external Credentials library. The bundled template lets you build that library
-with your own settings.
+external Credentials library for secrets. The bundled template lets you build that 
+library with your own values.
 
 ## Start here
 

@@ -46,10 +46,8 @@ jobs:
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
           $python = '..\libraries\JaszczurHAL\.build\windows\venv\Scripts\python.exe'
-          & $python tests/test_credentials_tooling.py
-          if ($LASTEXITCODE -ne 0) { throw 'Credentials tooling tests failed.' }
-          & $python tests/test_vscode_project.py
-          if ($LASTEXITCODE -ne 0) { throw 'VS Code project tests failed.' }
+          & $python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Project tooling tests failed.' }
 
       - name: Install and build non-secret Credentials fixture
         shell: powershell

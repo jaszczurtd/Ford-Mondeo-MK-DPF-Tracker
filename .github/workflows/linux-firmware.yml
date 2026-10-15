@@ -46,6 +46,10 @@ jobs:
           python3 scripts/component_manager.py source-components
           python3 scripts/component_manager.py component picotool --enable
 
+      - name: Validate project generators and Credentials safety
+        working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
+        run: python3 -m unittest discover -s tests -v
+
       - name: Install and build non-secret Credentials fixture
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
