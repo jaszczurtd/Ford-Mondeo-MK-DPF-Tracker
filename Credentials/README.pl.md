@@ -8,7 +8,7 @@ platformy firmware'u. Dane są przechowywane bez szyfrowania.
 
 ## Konfiguracja prywatnej kopii
 
-Instalator trackera kopiuje ten katalog do `../libraries/Credentials`
+Instalator trackera kopiuje ten katalog do `../Credentials`
 i odmawia nadpisania istniejącego katalogu. Jeśli kopiujesz szablon samodzielnie,
 uruchom z katalogu Credentials:
 
@@ -42,8 +42,7 @@ py -3 scripts/build.py rp2040
 
 | Platforma | Archiwum |
 | --- | --- |
-| `rp2040` | `src/cortex-m0plus/libCredentials.a` |
-| `rp2350-arm`, `rp2350-riscv`, `stm32g474`, `esp32`, `esp32s3` | `build/<target>/libCredentials.a` |
+| `rp2040`, `rp2350-arm`, `rp2350-riscv`, `stm32g474`, `esp32`, `esp32s3` | `build/<target>/libCredentials.a` |
 
 Skrypt szuka JaszczurHAL obok zainstalowanego katalogu Credentials. Przy innym
 układzie podaj `--jaszczurhal-root /path/to/JaszczurHAL`. Korzysta z CMake,

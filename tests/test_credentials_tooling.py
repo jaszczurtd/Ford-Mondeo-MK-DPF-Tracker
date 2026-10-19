@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-JASZCZURHAL = REPO_ROOT.parent / "libraries" / "JaszczurHAL"
+JASZCZURHAL = REPO_ROOT.parent / "JaszczurHAL"
 
 
 def load_builder(credentials: Path = REPO_ROOT / "Credentials"):
@@ -310,7 +310,7 @@ class CredentialsToolingTests(unittest.TestCase):
             self.assertIn(f"-DPICO_TOOLCHAIN_PATH={(root / 'GNU Arm bin').resolve().as_posix()}", joined)
             self.assertIn(f"-DCREDENTIALS_JASZCZURHAL_ROOT={JASZCZURHAL.resolve().as_posix()}", joined)
             self.assertEqual(
-                str(credentials.resolve() / "src" / "cortex-m0plus" / "libCredentials.a"),
+                str(credentials.resolve() / "build" / "rp2040" / "libCredentials.a"),
                 command["archive"],
             )
 

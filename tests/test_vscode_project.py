@@ -52,7 +52,7 @@ class VscodeProjectTests(unittest.TestCase):
         self.assertNotIn("jaszczurhal.uploadPort", settings)
         self.assertEqual(
             settings["jaszczurhal.vscodeEntryWindows"],
-            "../libraries/JaszczurHAL/vscode/entry/jh-vscode.cmd",
+            "../JaszczurHAL/vscode/entry/jh-vscode.cmd",
         )
         manifest = json.loads(
             (REPO_ROOT / ".vscode" / "jaszczurhal.project.json").read_text(

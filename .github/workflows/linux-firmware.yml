@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: jaszczurtd/JaszczurHAL
-          path: workspace/libraries/JaszczurHAL
+          path: workspace/JaszczurHAL
 
       - name: Install native RP and STM32 build prerequisites
         run: |
@@ -40,7 +40,7 @@ jobs:
           test -f "$(arm-none-eabi-g++ -print-file-name=libstdc++.a)"
 
       - name: Provision pinned JaszczurHAL components
-        working-directory: workspace/libraries/JaszczurHAL
+        working-directory: workspace/JaszczurHAL
         run: |
           set -eux
           python3 scripts/component_manager.py source-components
@@ -55,16 +55,16 @@ jobs:
         run: |
           set -eux
           python3 scripts/setup_credentials.py --test-config
-          python3 ../libraries/Credentials/scripts/build.py rp2040
-          python3 ../libraries/Credentials/scripts/build.py stm32g474
-          test -f ../libraries/Credentials/src/cortex-m0plus/libCredentials.a
-          test -f ../libraries/Credentials/build/stm32g474/libCredentials.a
+          python3 ../Credentials/scripts/build.py rp2040
+          python3 ../Credentials/scripts/build.py stm32g474
+          test -f ../Credentials/build/rp2040/libCredentials.a
+          test -f ../Credentials/build/stm32g474/libCredentials.a
 
       - name: Build RP2040 Tracker firmware
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
           set -eux
-          ../libraries/JaszczurHAL/vscode/entry/jh-vscode build \
+          ../JaszczurHAL/vscode/entry/jh-vscode build \
             --project "$PWD" --assembly rp2040-zero
           mkdir -p .build/ci-artifacts
           cp .build/rp2040/rp2040-zero/firmware.elf .build/ci-artifacts/tracker-rp2040-zero.elf
@@ -74,16 +74,16 @@ jobs:
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
           set -eux
-          ../libraries/JaszczurHAL/vscode/entry/jh-vscode build-debug \
+          ../JaszczurHAL/vscode/entry/jh-vscode build-debug \
             --project "$PWD" --assembly rp2040-zero
-          ../libraries/JaszczurHAL/vscode/entry/jh-vscode refresh-intellisense \
+          ../JaszczurHAL/vscode/entry/jh-vscode refresh-intellisense \
             --project "$PWD" --assembly rp2040-zero
 
       - name: Build STM32G474 Tracker firmware
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
           set -eux
-          ../libraries/JaszczurHAL/vscode/entry/jh-vscode build \
+          ../JaszczurHAL/vscode/entry/jh-vscode build \
             --project "$PWD" --assembly nucleo
           cp .build/stm32g474/nucleo/firmware.elf .build/ci-artifacts/tracker-stm32g474.elf
 

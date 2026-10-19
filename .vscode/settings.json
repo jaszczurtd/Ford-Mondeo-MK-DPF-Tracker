@@ -1,8 +1,8 @@
 {
     "jaszczurhal.buildDir": "${workspaceFolder}/.build",
     "jaszczurhal.verbose": true,
-    "jaszczurhal.root": "../libraries/JaszczurHAL",
-    "jaszczurhal.vscodeEntry": "../libraries/JaszczurHAL/vscode/entry/jh-vscode",
+    "jaszczurhal.root": "../JaszczurHAL",
+    "jaszczurhal.vscodeEntry": "../JaszczurHAL/vscode/entry/jh-vscode",
     "C_Cpp.default.configurationProvider": "",
     "C_Cpp.default.compileCommands": "${workspaceFolder}/.build/compile_commands_patched.json",
     "C_Cpp.errorSquiggles": "enabled",
@@ -13,6 +13,6 @@
     },
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 500,
-    "jaszczurhal.vscodeEntryWindows": "../libraries/JaszczurHAL/vscode/entry/jh-vscode.cmd",
+    "jaszczurhal.vscodeEntryWindows": "../JaszczurHAL/vscode/entry/jh-vscode.cmd",
     "cortex-debug.gdbPath.linux": "gdb-multiarch"
 }

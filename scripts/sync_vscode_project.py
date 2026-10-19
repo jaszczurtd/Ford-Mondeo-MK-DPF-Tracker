@@ -12,7 +12,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_JH_ROOT = REPO_ROOT.parent / "libraries" / "JaszczurHAL"
+DEFAULT_JH_ROOT = REPO_ROOT.parent / "JaszczurHAL"
 
 
 def load_json(path: Path) -> Any:
@@ -85,7 +85,7 @@ def main(argv: list[str]) -> int:
     settings.pop("jaszczurhal.uploadPort", None)
     unix_entry = str(
         settings.get("jaszczurhal.vscodeEntry")
-        or "../libraries/JaszczurHAL/vscode/entry/jh-vscode"
+        or "../JaszczurHAL/vscode/entry/jh-vscode"
     )
     settings.update(vscode_entry_settings(unix_entry))
     # IntelliSense follows the database of Project: Refresh IntelliSense.

@@ -2,14 +2,14 @@
 
 [English](BUILDING.md) · [O projekcie](../README.pl.md)
 
-Polecenia uruchamiaj z katalogu głównego trackera. Umieść JaszczurHAL w
-`../libraries/JaszczurHAL` i przygotuj jego narzędzia przez `runmefirst.sh`
+Polecenia uruchamiaj z katalogu głównego trackera. Umieść JaszczurHAL obok
+tego repozytorium, w `../JaszczurHAL`, i przygotuj jego narzędzia przez `runmefirst.sh`
 na Linuksie lub `runmefirst.ps1` na Windows. Firmware używa oficjalnego Pico SDK
 dla RP2040 oraz kompilacji STM32 zapewnianej przez HAL dla STM32G474.
 
 ## Przygotowanie Credentials
 
-Firmware linkuje `../libraries/Credentials`, poza tym repozytorium. Jeśli ten
+Firmware linkuje `../Credentials`, poza tym repozytorium. Jeśli ten
 katalog istnieje, używaj jego pasującego nagłówka i archiwum; instalator odmówi
 zastąpienia go. Katalog `Credentials/` w repozytorium jest publicznym szablonem,
 a nie aktywną biblioteką.
@@ -24,8 +24,8 @@ W nowym środowisku zainstaluj prywatną kopię:
 py -3 scripts/setup_credentials.py
 ```
 
-Edytuj `../libraries/Credentials/config/CredentialsData.local.h` i
-`../libraries/Credentials/config/MacHostMapping.local.cpp`. Zastąp wartości
+Edytuj `../Credentials/config/CredentialsData.local.h` i
+`../Credentials/config/MacHostMapping.local.cpp`. Zastąp wartości
 przykładowe i ustaw `CREDENTIALS_LOCAL_CONFIGURED` na `1`. Tracker odczytuje
 `CR_MQTT_BROKER_IP`, `CR_MQTT_BROKER_SECURE_PORT`, `CR_MQTT_USER`,
 `CR_MQTT_PASSWORD` oraz, gdy potrzeba, `CR_SIM_PIN`. Modem wymaga też certyfikatu
@@ -34,19 +34,20 @@ przykładowe i ustaw `CREDENTIALS_LOCAL_CONFIGURED` na `1`. Tracker odczytuje
 Zbuduj archiwum dla wybranego montażu:
 
 ```bash
-../libraries/Credentials/scripts/build.sh rp2040
+../Credentials/scripts/build.sh rp2040
 # Dla montażu nucleo:
-../libraries/Credentials/scripts/build.sh stm32g474
+../Credentials/scripts/build.sh stm32g474
 ```
 
 ```powershell
-py -3 ../libraries/Credentials/scripts/build.py rp2040
+py -3 ../Credentials/scripts/build.py rp2040
 # Dla montażu nucleo:
-py -3 ../libraries/Credentials/scripts/build.py stm32g474
+py -3 ../Credentials/scripts/build.py stm32g474
 ```
 
-Manifest linkuje `src/cortex-m0plus/libCredentials.a` dla RP2040 i
-`build/stm32g474/libCredentials.a` dla STM32, względem zainstalowanej biblioteki.
+Manifest linkuje `build/<target>/libCredentials.a` dla platformy wybranego
+montażu (`rp2040` dla `rp2040-zero`, `stm32g474` dla `nucleo`), względem
+zainstalowanej biblioteki.
 Brakujące archiwum STM32 trzeba zbudować dla tego układu; archiwum RP2040 nie
 jest zamiennikiem. Nie zapisuj prywatnej konfiguracji ani archiwów w Git.
 Wszystkie obsługiwane platformy opisuje [instrukcja biblioteki](../Credentials/README.pl.md).
@@ -58,15 +59,15 @@ wybiera `rp2040-zero`. Montaż `nucleo` służy kontroli kompilacji STM32 i ma
 mniejsze kolejki RAM; nie jest potwierdzoną instalacją sprzętową.
 
 ```bash
-../libraries/JaszczurHAL/vscode/entry/jh-vscode config-dump --project . --assembly rp2040-zero
-../libraries/JaszczurHAL/vscode/entry/jh-vscode build --project . --assembly rp2040-zero
-../libraries/JaszczurHAL/vscode/entry/jh-vscode refresh-intellisense --project . --assembly rp2040-zero
+../JaszczurHAL/vscode/entry/jh-vscode config-dump --project . --assembly rp2040-zero
+../JaszczurHAL/vscode/entry/jh-vscode build --project . --assembly rp2040-zero
+../JaszczurHAL/vscode/entry/jh-vscode refresh-intellisense --project . --assembly rp2040-zero
 ```
 
 Na Windows:
 
 ```powershell
-& ..\libraries\JaszczurHAL\vscode\entry\jh-vscode.cmd build --project . --assembly rp2040-zero
+& ..\JaszczurHAL\vscode\entry\jh-vscode.cmd build --project . --assembly rp2040-zero
 ```
 
 Zastąp `rp2040-zero` przez `nucleo`, aby zbudować STM32. `--assembly` wybiera

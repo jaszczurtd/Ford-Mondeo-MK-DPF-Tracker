@@ -16,8 +16,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--destination",
         type=Path,
-        default=project_dir.parent / "libraries" / "Credentials",
-        help="Credentials destination (default: ../libraries/Credentials).",
+        default=project_dir.parent / "Credentials",
+        help="Credentials destination (default: ../Credentials).",
     )
     parser.add_argument(
         "--test-config",

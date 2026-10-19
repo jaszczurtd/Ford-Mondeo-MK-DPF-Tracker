@@ -8,7 +8,7 @@ archive for the target firmware. Values are stored without encryption.
 
 ## Configure a private copy
 
-The tracker installer copies this directory to `../libraries/Credentials`
+The tracker installer copies this directory to `../Credentials`
 and refuses an existing destination. If you copied the template yourself,
 run from the Credentials directory:
 
@@ -42,8 +42,7 @@ py -3 scripts/build.py rp2040
 
 | Target | Archive |
 | --- | --- |
-| `rp2040` | `src/cortex-m0plus/libCredentials.a` |
-| `rp2350-arm`, `rp2350-riscv`, `stm32g474`, `esp32`, `esp32s3` | `build/<target>/libCredentials.a` |
+| `rp2040`, `rp2350-arm`, `rp2350-riscv`, `stm32g474`, `esp32`, `esp32s3` | `build/<target>/libCredentials.a` |
 
 The builder locates JaszczurHAL next to the installed Credentials directory.
 For another layout, pass `--jaszczurhal-root /path/to/JaszczurHAL`.

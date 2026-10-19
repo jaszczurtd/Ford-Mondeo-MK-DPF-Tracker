@@ -19,9 +19,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# The archive of rp2040 keeps the precompiled-library layout that the
-# projects already link; every other target builds into build/<target>.
-RP2040_ARCHIVE = Path("src") / "cortex-m0plus" / "libCredentials.a"
 ARM_TOOLS = ("gcc", "g++", "ar", "ranlib")
 
 
@@ -60,7 +57,6 @@ def load_host_environment(root_dir: Path, explicit: Path | None) -> dict[str, An
         (
             root_dir.parent / "JaszczurHAL" / ".build" / "windows" / "host-environment.json",
             root_dir.parent.parent
-            / "libraries"
             / "JaszczurHAL"
             / ".build"
             / "windows"
@@ -106,7 +102,7 @@ def resolve_jaszczurhal_root(root_dir: Path, explicit: Path | None) -> Path:
     candidates.extend(
         (
             root_dir.parent / "JaszczurHAL",
-            root_dir.parent.parent / "libraries" / "JaszczurHAL",
+            root_dir.parent.parent / "JaszczurHAL",
         )
     )
 
@@ -273,9 +269,8 @@ def main() -> int:
         if args.build_dir is not None
         else root_dir / "build" / args.target
     )
-    archive_dir = (
-        (root_dir / RP2040_ARCHIVE).parent if args.target == "rp2040" else build_dir
-    )
+    # Every target builds into build/<target>/libCredentials.a.
+    archive_dir = build_dir
     configure_command = [
         str(cmake),
         "-S",

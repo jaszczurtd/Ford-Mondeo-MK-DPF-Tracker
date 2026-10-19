@@ -25,17 +25,17 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: jaszczurtd/JaszczurHAL
-          path: workspace/libraries/JaszczurHAL
+          path: workspace/JaszczurHAL
 
       - name: Cache authenticated Windows tools
         uses: actions/cache@v4
         with:
           path: C:\jh\tools
-          key: ford-windows-tools-${{ hashFiles('workspace/libraries/JaszczurHAL/third_party/windows_tools_version.conf', 'workspace/libraries/JaszczurHAL/third_party/riscv_toolchain_version.conf', 'workspace/libraries/JaszczurHAL/third_party/windows_requirements.txt') }}
+          key: ford-windows-tools-${{ hashFiles('workspace/JaszczurHAL/third_party/windows_tools_version.conf', 'workspace/JaszczurHAL/third_party/riscv_toolchain_version.conf', 'workspace/JaszczurHAL/third_party/windows_requirements.txt') }}
 
       - name: Prepare native Windows environment
         shell: powershell
-        working-directory: workspace/libraries/JaszczurHAL
+        working-directory: workspace/JaszczurHAL
         run: >-
           .\runmefirst.ps1 -Force -ConfigureHost -FirmwareOnly
           -ToolsRoot C:\jh\tools
@@ -45,7 +45,7 @@ jobs:
         shell: powershell
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
-          $python = '..\libraries\JaszczurHAL\.build\windows\venv\Scripts\python.exe'
+          $python = '..\JaszczurHAL\.build\windows\venv\Scripts\python.exe'
           & $python -m unittest discover -s tests -v
           if ($LASTEXITCODE -ne 0) { throw 'Project tooling tests failed.' }
 
@@ -53,12 +53,12 @@ jobs:
         shell: powershell
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
-          $jh = Resolve-Path '..\libraries\JaszczurHAL'
+          $jh = Resolve-Path '..\JaszczurHAL'
           $python = Join-Path $jh '.build\windows\venv\Scripts\python.exe'
           $state = Join-Path $jh '.build\windows\host-environment.json'
           & $python scripts/setup_credentials.py --test-config
           if ($LASTEXITCODE -ne 0) { throw 'Credentials fixture setup failed.' }
-          $builder = '..\libraries\Credentials\scripts\build.py'
+          $builder = '..\Credentials\scripts\build.py'
           & $python $builder rp2040 --host-environment $state
           if ($LASTEXITCODE -ne 0) { throw 'RP2040 Credentials build failed.' }
           & $python $builder stm32g474 --host-environment $state
@@ -68,7 +68,7 @@ jobs:
         shell: powershell
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
-          $entry = '..\libraries\JaszczurHAL\vscode\entry\jh-vscode.cmd'
+          $entry = '..\JaszczurHAL\vscode\entry\jh-vscode.cmd'
           & $entry build --project . --assembly rp2040-zero
           if ($LASTEXITCODE -ne 0) { throw 'RP2040 Tracker build failed.' }
           & $entry refresh-intellisense --project . --assembly rp2040-zero
@@ -80,7 +80,7 @@ jobs:
         shell: powershell
         working-directory: workspace/Ford-Mondeo-MK-DPF-Tracker
         run: |
-          $entry = '..\libraries\JaszczurHAL\vscode\entry\jh-vscode.cmd'
+          $entry = '..\JaszczurHAL\vscode\entry\jh-vscode.cmd'
           & $entry build --project . --assembly nucleo
           if ($LASTEXITCODE -ne 0) { throw 'STM32G474 Tracker build failed.' }
           & $entry refresh-intellisense --project . --assembly nucleo

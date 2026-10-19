@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-HAL = ROOT.parent / "libraries/JaszczurHAL"
+HAL = ROOT.parent / "JaszczurHAL"
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "GPIO host probe uses GCC/Clang and ELF section GC")
