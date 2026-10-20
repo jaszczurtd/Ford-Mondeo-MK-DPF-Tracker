@@ -10,6 +10,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 HAL = ROOT.parent / "JaszczurHAL"
+sys.path.insert(0, str(HAL / "scripts"))
+
+import component_manager  # noqa: E402
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "GPIO host probe uses GCC/Clang and ELF section GC")
@@ -42,6 +45,7 @@ class GpioTests(unittest.TestCase):
                                       "-Wall", "-Wextra", "-Werror", "-ffunction-sections", "-fdata-sections",
                                       "-DHAL_TARGET_MOCK=1", "-I", str(build), "-I", str(ROOT),
                                       "-I", str(ROOT / "Credentials/src"), "-I", str(HAL / "src"),
+                                      "-I", str(component_manager.jhbase_root(HAL) / "include"),
                                       "-I", str(HAL / "third_party/cJSON"),
                                       "-include", str(build / "jh_hardware.h"),
                                       str(ROOT / "tests/test_gpio.cpp"), "-Wl,--gc-sections", "-o", str(binary)])
