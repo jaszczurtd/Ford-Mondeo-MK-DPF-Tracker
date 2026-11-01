@@ -16,6 +16,7 @@
 #include "tracker.h"
 
 #include <cJSON.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -117,7 +118,13 @@ static uint16_t data_queue_tail = 0;
 static uint16_t data_queue_count = 0;
 static uint32_t data_queue_overflow_count = 0;
 
+// Two decimals, or null for a value that is no number: a missing or faulty
+// thermocouple reads as NAN, and a raw "nan" would make the whole payload
+// invalid JSON.
 static cJSON* addFixed2Number(cJSON* root, const char* key, float value) {
+  if (!isfinite(value)) {
+    return cJSON_AddNullToObject(root, key);
+  }
   char num_buf[24] = {0};
   (void)snprintf(num_buf, sizeof(num_buf), "%.2f",
                  (double)hal_math_round_precision(value, 2));

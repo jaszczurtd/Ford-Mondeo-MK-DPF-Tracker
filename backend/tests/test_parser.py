@@ -35,6 +35,27 @@ def test_parse_data_payload() -> None:
     assert parsed.status is None
 
 
+def test_data_payload_without_egt_measurement_keeps_the_other_fields() -> None:
+    # The firmware writes null for a missing or faulty thermocouple.
+    payload = '{"version":"v0.4","egt_pre":null,"egt_mid":287.12,"ms":10}'
+
+    parsed = parse_mqtt_message(TOPIC_DATA, payload, received_at=RECEIVED_AT)
+
+    assert parsed.raw.parse_ok is True
+    assert parsed.telemetry is not None
+    assert parsed.telemetry.payload["egt_pre"] is None
+    assert parsed.telemetry.payload["egt_mid"] == 287.12
+
+
+def test_raw_nan_from_older_firmware_loses_the_whole_payload() -> None:
+    payload = '{"version":"v0.4","egt_pre":nan,"egt_mid":287.12,"ms":10}'
+
+    parsed = parse_mqtt_message(TOPIC_DATA, payload, received_at=RECEIVED_AT)
+
+    assert parsed.raw.parse_ok is False
+    assert parsed.telemetry is None
+
+
 def test_parse_event_batch_payload() -> None:
     payload = (
         '{"version":"v0.4","ms":1234600,"batch_count":2,'

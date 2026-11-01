@@ -32,7 +32,7 @@ przetrwania dowolnie długiej przerwy w łączności.
 | --- | --- |
 | `version` | Wersja firmware’u (`VERSION`), nie osobna wersja schematu. |
 | `time`, `ms` | Ostatni czas sieciowy ISO 8601 (pusty do uzyskania odczytu) i bieżący czas działania w ms. |
-| `egt_pre`, `egt_mid`, `mcu_temp` | Temperatura przed DPF, w środkowym kanale DPF i MCU, w °C. |
+| `egt_pre`, `egt_mid`, `mcu_temp` | Temperatura przed DPF, w środkowym kanale DPF i MCU, w °C; `null` bez pomiaru, np. przy braku MCP9600 albo przerwanej, zwartej lub poza zakresem termoparze. |
 | `dp_voltage`, `dp_raw` | Napięcie czujnika w V i odczyt ADC; bez kalibracji do jednostek ciśnienia. |
 | `pump_onoff_period`, `pump_freq_hz` | Oba oznaczają częstotliwość w Hz mimo nazwy pierwszego pola; zero po 2 s bez zbocza ON. |
 | `pump_cnt` | Zbocza ON od poprzedniego tworzenia wiadomości; licznik jest zerowany przy tworzeniu, również gdy wiadomość zostanie później odrzucona. |

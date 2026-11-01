@@ -31,7 +31,7 @@ This does not guarantee exactly-once delivery or unlimited outage coverage.
 | --- | --- |
 | `version` | Firmware version (`VERSION`), not a separate schema version. |
 | `time`, `ms` | Last network time in ISO 8601 (empty until available), and current uptime in ms. |
-| `egt_pre`, `egt_mid`, `mcu_temp` | Pre-DPF, mid-DPF and MCU temperature in °C. |
+| `egt_pre`, `egt_mid`, `mcu_temp` | Pre-DPF, mid-DPF and MCU temperature in °C; `null` without a measurement, e.g. a missing MCP9600 or an open, shorted or out-of-range thermocouple. |
 | `dp_voltage`, `dp_raw` | Sensor voltage in V and raw ADC reading; no pressure calibration yet. |
 | `pump_onoff_period`, `pump_freq_hz` | Both express frequency in Hz, despite the first field’s name; zero after 2 s without an ON edge. |
 | `pump_cnt` | ON edges since the previous payload construction; resets during construction, even if that payload is later dropped. |
