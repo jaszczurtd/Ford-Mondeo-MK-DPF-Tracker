@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -27,6 +29,28 @@ def load_builder(credentials: Path = REPO_ROOT / "Credentials"):
     builder = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(builder)
     return builder
+
+
+def host_cmake() -> Path:
+    """The CMake the builder chooses on this host."""
+    builder = load_builder()
+    state = builder.load_host_environment(REPO_ROOT / "Credentials", None)
+    return builder.resolve_program("CMake", None, state.get("tools", {}).get("cmake"), ("cmake",))
+
+
+# The builder reads the HAL board registry through the jh host CLI. The module
+# prepares it once with this host's CMake, so builders run below with fake
+# managed tools or without PATH find it in JH_EXECUTABLE.
+JH_ENVIRONMENT = patch.dict(os.environ)
+
+
+def setUpModule() -> None:
+    JH_ENVIRONMENT.start()
+    load_builder().prepare_jh(JASZCZURHAL, host_cmake())
+
+
+def tearDownModule() -> None:
+    JH_ENVIRONMENT.stop()
 
 
 def run_python(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -169,7 +193,7 @@ class CredentialsToolingTests(unittest.TestCase):
         builder = load_builder()
         state = builder.load_host_environment(REPO_ROOT / "Credentials", None)
         tools = state.get("tools", {})
-        cmake = builder.resolve_program("CMake", None, tools.get("cmake"), ("cmake",))
+        cmake = host_cmake()
         ninja = builder.resolve_program("Ninja", None, tools.get("ninja"), ("ninja",))
         arm = builder.resolve_arm_bin(
             SimpleNamespace(target="stm32g474", toolchain_bin=None), state
@@ -193,6 +217,9 @@ class CredentialsToolingTests(unittest.TestCase):
             results = []
 
             def run_isolated(command, **kwargs):
+                if command[0] != str(cmake):
+                    # The HAL registry runs jh; only the build's CMake counts.
+                    return real_run(command, **kwargs)
                 if "-S" in command:
                     # CMake also searches /usr/bin without PATH. Disable that
                     # fallback in the main configure AND its try_compile child.
@@ -225,6 +252,42 @@ class CredentialsToolingTests(unittest.TestCase):
                     self.assertEqual(len(results), 2)
             archive = credentials / "build" / "stm32g474" / "libCredentials.a"
             self.assertGreater(archive.stat().st_size, 0)
+
+    def test_builder_hands_its_cmake_to_the_jh_preparation(self) -> None:
+        # A managed CMake (runmefirst -ConfigureHost on Windows) need not be on
+        # PATH, so the builder prepares jh, through which the HAL scripts read
+        # the board registry, with its own CMake before the registry asks.
+        cmake = host_cmake()
+        prepared = os.environ["JH_EXECUTABLE"]
+        calls = []
+
+        def jh_executable(program="cmake", environment=None):
+            calls.append(program)
+            return prepared
+
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(sys, "path", sys.path.copy()):
+            root = Path(temporary)
+            credentials, state = template_with_managed_tools(root)
+            builder = load_builder(credentials)
+            builder.hal_scripts(JASZCZURHAL)
+            import project_config
+
+            argv = [
+                str(credentials / "scripts" / "build.py"), "stm32g474",
+                "--host-environment", str(state), "--jaszczurhal-root", str(JASZCZURHAL),
+                "--cmake", str(cmake), "--dry-run",
+            ]
+            output = io.StringIO()
+            with patch.dict(os.environ, {"PATH": str(root)}), patch.object(sys, "argv", argv), \
+                    patch.object(project_config, "jh_executable", side_effect=jh_executable), \
+                    contextlib.redirect_stdout(output):
+                os.environ.pop("JH_EXECUTABLE")
+                os.environ.pop("JH_EXECUTABLE_ROOT", None)
+                result = builder.main()
+        self.assertEqual(result, 0)
+        self.assertEqual(calls[0], str(cmake))
+        self.assertEqual(json.loads(output.getvalue())["configure"][0], str(cmake))
 
     def test_configure_test_creates_only_public_fixture_values(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
