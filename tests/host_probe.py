@@ -10,6 +10,7 @@ HAL = ROOT.parent / "JaszczurHAL"
 sys.path.insert(0, str(HAL / "scripts"))
 
 import component_manager  # noqa: E402
+from project_config import jh_executable  # noqa: E402
 
 
 def run(command):
@@ -22,8 +23,9 @@ def generate_hardware(build, assembly):
     """Write jh_hardware.h of @p assembly from build/device_tree.json and the
     project config into @p build."""
     (build / "hal_project_config.h").write_text((ROOT / "hal_project_config.h").read_text())
-    generator = [sys.executable, str(HAL / "scripts/generate_hardware_config.py")]
-    common = ["--config-dir", str(build), "--output-root", str(build), "--output-dir", str(build)]
+    generator = [jh_executable(), "hardware"]
+    common = ["--root", str(HAL), "--config-dir", str(build),
+              "--output-root", str(build), "--output-dir", str(build)]
     for command in ([*generator, "resolve", *common, "--assembly", assembly],
                     [*generator, "finalize", *common,
                      "--hardware", str(build / "jh_hardware_resolved.json"),
