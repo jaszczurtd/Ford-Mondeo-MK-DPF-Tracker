@@ -14,5 +14,8 @@
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 500,
     "jaszczurhal.vscodeEntryWindows": "../JaszczurHAL/vscode/entry/jh-vscode.cmd",
-    "cortex-debug.gdbPath.linux": "gdb-multiarch"
+    "cortex-debug.gdbPath.linux": "gdb-multiarch",
+    "C_Cpp.files.exclude": {
+        "**/.build": true
+    }
 }
